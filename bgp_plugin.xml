@@ -1,0 +1,7 @@
+<library path="lib/libvoronoi_planner">
+  <class name="voronoi_planner/VoronoiPlannerROS" type="voronoi_planner::VoronoiPlannerROS" base_class_type="nav_core::BaseGlobalPlanner">
+    <description>
+      An implementation of Voronoi path planner
+    </description>
+  </class>
+</library>
