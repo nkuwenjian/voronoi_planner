@@ -3,23 +3,16 @@ This repo contains a global planner plugin for ROS navigation stack, in which A*
 
 ## How to use?
 
-1. Clone and build voronoi_layer costmap plugin
+### 1. Clone and build voronoi_layer and voronoi_planner
 ```
 $ cd ~/catkin_ws/src/
 $ git clone https://github.com/nkuwenjian/voronoi_layer.git
-$ cd ../
-$ catkin_make -DCMAKE_BUILD_TYPE=Release
-```
-
-2. Clone and build voronoi_planner plugin
-```
-$ cd ~/catkin_ws/src/
 $ git clone https://github.com/nkuwenjian/voronoi_planner.git
 $ cd ../
 $ catkin_make -DCMAKE_BUILD_TYPE=Release
 ```
 
-3. Setup for move_base
+### 2. Setup the configurations for ROS navigation stack
 
 In the move_base launch file, use voronoi_planner to override the default global planner, which may like this:
 ```
