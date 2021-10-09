@@ -119,20 +119,42 @@ bool VoronoiPlanner::search(int startX, int startY, int goalX, int goalY, int& p
   std::vector<std::pair<int, int> > path1, path2, path3;
   int pathCost1, pathCost2, pathCost3;
   int voronoiStartX, voronoiStartY;
-  if (!SearchShortestPathToVoronoi(startX, startY, voronoiStartX, voronoiStartY, pathCost1, &path1, voronoiDiagram,
-                                   circumscribed_radius))
+  if (!SearchShortestPathToVoronoi(startX, startY, goalX, goalY, voronoiStartX, voronoiStartY, pathCost1, &path1,
+                                   voronoiDiagram, circumscribed_radius))
   {
     printf("Failed to fine the path from start to voronoi\n");
     return false;
   }
   std::reverse(path1.begin(), path1.end());
 
+  if (voronoiStartX == goalX && voronoiStartY == goalY)
+  {
+    path->clear();
+    for (int i = 0; i < (int)path1.size(); i++)
+      path->push_back(path1[i]);
+
+    pathCost = pathCost1;
+
+    return true;
+  }
+
   int voronoiGoalX, voronoiGoalY;
-  if (!SearchShortestPathToVoronoi(goalX, goalY, voronoiGoalX, voronoiGoalY, pathCost3, &path3, voronoiDiagram,
-                                   circumscribed_radius))
+  if (!SearchShortestPathToVoronoi(goalX, goalY, startX, startY, voronoiGoalX, voronoiGoalY, pathCost3, &path3,
+                                   voronoiDiagram, circumscribed_radius))
   {
     printf("Failed to the find the path from voronoi to goal\n");
     return false;
+  }
+
+  if (voronoiGoalX == startX && voronoiGoalY == startY)
+  {
+    path->clear();
+    for (int i = 0; i < (int)path3.size(); i++)
+      path->push_back(path3[i]);
+
+    pathCost = pathCost3;
+
+    return true;
   }
 
   if (!SearchInVoronoi(voronoiStartX, voronoiStartY, voronoiGoalX, voronoiGoalY, pathCost2, &path2, voronoiDiagram,
@@ -257,9 +279,10 @@ bool VoronoiPlanner::SearchInVoronoi(int startX, int startY, int goalX, int goal
   return true;
 }
 
-bool VoronoiPlanner::SearchShortestPathToVoronoi(int startX, int startY, int& voronoiGoalX, int& voronoiGoalY,
-                                                 int& pathCost, std::vector<std::pair<int, int> >* path,
-                                                 VoronoiData** voronoiDiagram, double circumscribed_radius)
+bool VoronoiPlanner::SearchShortestPathToVoronoi(int startX, int startY, int goalX, int goalY, int& voronoiGoalX,
+                                                 int& voronoiGoalY, int& pathCost,
+                                                 std::vector<std::pair<int, int> >* path, VoronoiData** voronoiDiagram,
+                                                 double circumscribed_radius)
 {
   if (!WithinSearchSpace(startX, startY))
   {
@@ -289,7 +312,7 @@ bool VoronoiPlanner::SearchShortestPathToVoronoi(int startX, int startY, int& vo
     int exp_x = searchExpState->x;
     int exp_y = searchExpState->y;
 
-    if (voronoiDiagram[exp_x][exp_y].isVoronoi)
+    if ((exp_x == goalX && exp_y == goalY) || (voronoiDiagram[exp_x][exp_y].isVoronoi))
     {
       voronoiGoalX = exp_x;
       voronoiGoalY = exp_y;

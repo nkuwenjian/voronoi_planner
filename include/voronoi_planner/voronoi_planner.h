@@ -52,8 +52,8 @@ private:
   bool SearchInVoronoi(int startX, int startY, int goalX, int goalY, int& pathCost,
                        std::vector<std::pair<int, int> >* path, VoronoiData** voronoiDiagram,
                        double circumscribed_radius);
-  bool SearchShortestPathToVoronoi(int startX, int startY, int& voronoiGoalX, int& voronoiGoalY, int& pathCost,
-                                   std::vector<std::pair<int, int> >* path, VoronoiData** voronoiDiagram,
+  bool SearchShortestPathToVoronoi(int startX, int startY, int goalX, int goalY, int& voronoiGoalX, int& voronoiGoalY,
+                                   int& pathCost, std::vector<std::pair<int, int> >* path, VoronoiData** voronoiDiagram,
                                    double circumscribed_radius);
 
 private:
