@@ -29,7 +29,7 @@ include_directories(
 )
 
 add_library(${PROJECT_NAME}
-  src/heap.cpp 
+  src/heap.cpp
   src/voronoi_planner_ros.cpp
   src/voronoi_planner.cpp
 )
