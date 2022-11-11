@@ -97,13 +97,13 @@ bool VoronoiPlannerROS::makePlan(const geometry_msgs::PoseStamped& start, const 
       has_voronoi_layer = true;
       boost::unique_lock<boost::mutex> lock(*(voronoi_layer->getMutex()));
 
-      const DynamicVoronoi* voronoi = voronoi_layer->getVoronoi();
+      const DynamicVoronoi& voronoi = voronoi_layer->getVoronoi();
       for (int j = 0; j < size_y_; j++)
       {
         for (int i = 0; i < size_x_; i++)
         {
-          voronoi_diagram_[i][j].dist = voronoi->getDistance(i, j) * resolution;  // important!
-          voronoi_diagram_[i][j].isVoronoi = voronoi->isVoronoi(i, j);
+          voronoi_diagram_[i][j].dist = voronoi.getDistance(i, j) * resolution;  // important!
+          voronoi_diagram_[i][j].isVoronoi = voronoi.isVoronoi(i, j);
         }
       }
 
