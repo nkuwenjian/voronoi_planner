@@ -27,64 +27,56 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _HEAP_H_
-#define _HEAP_H_
+#pragma once
 
-#include <stdexcept>
 #include <cstdio>
+#include <stdexcept>
 
 // the maximum size of the heap
 #define HEAPSIZE 20000000
 #define HEAPSIZE_INIT 5000
 #define INFINITECOST 1000000000
 
-namespace voronoi_planner
-{
+namespace voronoi_planner {
 /**
  * \brief base class for a search state
  */
-class AbstractSearchState
-{
-public:
+class AbstractSearchState {
+ public:
   /**
-   * \brief index of the state in the heap, typically used for membership in OPEN
+   * \brief index of the state in the heap, typically used for membership in
+   * OPEN
    */
   int heapindex;
 
-public:
-  AbstractSearchState()
-  {
-  }
-  virtual ~AbstractSearchState()
-  {
-  }
+ public:
+  AbstractSearchState() = default;
+  virtual ~AbstractSearchState() = default;
 };
 
-struct HEAPINTELEMENT
-{
-  AbstractSearchState* heapstate;
+struct HEAPINTELEMENT {
+  AbstractSearchState* heapstate = nullptr;
   int key;
 };
 
 typedef struct HEAPINTELEMENT heapintelement;
 
-class CIntHeap
-{
+class CIntHeap {
   // data
-public:
+ public:
   int percolates;  // for counting purposes
   heapintelement* heap;
   int currentsize;
   int allocated;
 
   // constructors
-public:
+ public:
   CIntHeap();
-  CIntHeap(int initial_size);
+  explicit CIntHeap(int initial_size);
   ~CIntHeap();
 
   // functions
-public:
+ public:
   bool emptyheap();
   bool fullheap();
   bool inheap(AbstractSearchState* AbstractSearchState);
@@ -94,12 +86,12 @@ public:
   void deleteheap(AbstractSearchState* AbstractSearchState);
   void updateheap(AbstractSearchState* AbstractSearchState, int NewKey);
   AbstractSearchState* getminheap();
-  AbstractSearchState* getminheap(int& ReturnKey);
+  AbstractSearchState* getminheap(int* ReturnKey);
   int getminkeyheap();
   AbstractSearchState* deleteminheap();
   void makeheap();
 
-private:
+ private:
   void percolatedown(int hole, heapintelement tmp);
   void percolateup(int hole, heapintelement tmp);
   void percolateupordown(int hole, heapintelement tmp);
@@ -109,5 +101,3 @@ private:
 };
 
 }  // namespace voronoi_planner
-
-#endif
