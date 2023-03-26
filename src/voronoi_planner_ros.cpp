@@ -148,7 +148,7 @@ bool VoronoiPlannerROS::makePlan(
   std::vector<std::pair<int, int>> path;
   int path_cost;
 
-  if (!voronoi_planner_->search(start_x, start_y, goal_x, goal_y, &path_cost,
+  if (!voronoi_planner_->Search(start_x, start_y, goal_x, goal_y, &path_cost,
                                 &path, size_x, size_y, voronoi_diagram_,
                                 circumscribed_radius)) {
     ROS_WARN("Failed to find the shortest Voronoi path");

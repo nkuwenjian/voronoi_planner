@@ -29,213 +29,127 @@
 
 #include "voronoi_planner/heap.h"
 
-#include <stdexcept>
+#include "glog/logging.h"
 
 namespace voronoi_planner {
 
-void heaperror(const char* ErrorString) {
-  // need to send a message from here somehow
-  throw std::runtime_error(ErrorString);
+Heap::Heap() { queue_.resize(capacity_); }
+
+Heap::Heap(const size_t capacity) : capacity_(capacity) {
+  queue_.resize(capacity);
 }
 
-// constructors and destructors
-CIntHeap::CIntHeap() {
-  percolates = 0;
-  currentsize = 0;
-  allocated = HEAPSIZE_INIT;
+Heap::~Heap() { Clear(); }
 
-  heap = new heapintelement[allocated];
+void Heap::Clear() {
+  for (size_t i = 1; i <= size_; i++) {
+    queue_[i].element->set_index(0);
+  }
+  size_ = 0;
 }
 
-CIntHeap::CIntHeap(int initial_size) {
-  percolates = 0;
-  currentsize = 0;
-  allocated = initial_size;
-
-  heap = new heapintelement[allocated];
-}
-
-CIntHeap::~CIntHeap() {
-  for (int i = 1; i <= currentsize; ++i) {
-    heap[i].heapstate->heapindex = 0;
+void Heap::PercolateDown(size_t hole, HeapElement obj) {
+  if (Empty()) {
+    return;
   }
 
-  delete[] heap;
-}
-
-void CIntHeap::percolatedown(int hole, heapintelement tmp) {
-  int child;
-
-  if (currentsize != 0) {
-    for (; 2 * hole <= currentsize; hole = child) {
-      child = 2 * hole;
-
-      if (child != currentsize && heap[child + 1].key < heap[child].key) {
-        ++child;
-      }
-      if (heap[child].key < tmp.key) {
-        percolates += 1;
-        heap[hole] = heap[child];
-        heap[hole].heapstate->heapindex = hole;
-      } else {
-        break;
-      }
+  size_t child;
+  for (; 2 * hole <= size_; hole = child) {
+    child = 2 * hole;
+    if (child != size_ && queue_[child + 1].key < queue_[child].key) {
+      child++;
     }
-    heap[hole] = tmp;
-    heap[hole].heapstate->heapindex = hole;
-  }
-}
-
-void CIntHeap::percolateup(int hole, heapintelement tmp) {
-  if (currentsize != 0) {
-    for (; hole > 1 && tmp.key < heap[hole / 2].key; hole /= 2) {
-      percolates += 1;
-      heap[hole] = heap[hole / 2];
-      heap[hole].heapstate->heapindex = hole;
-    }
-    heap[hole] = tmp;
-    heap[hole].heapstate->heapindex = hole;
-  }
-}
-
-void CIntHeap::percolateupordown(int hole, heapintelement tmp) {
-  if (currentsize != 0) {
-    if (hole > 1 && heap[hole / 2].key > tmp.key) {
-      percolateup(hole, tmp);
+    if (queue_[child].key < obj.key) {
+      queue_[hole] = queue_[child];
+      queue_[hole].element->set_index(hole);
     } else {
-      percolatedown(hole, tmp);
+      break;
     }
   }
+  queue_[hole] = obj;
+  queue_[hole].element->set_index(hole);
 }
 
-bool CIntHeap::emptyheap() { return currentsize == 0; }
-
-bool CIntHeap::fullheap() { return currentsize == HEAPSIZE - 1; }
-
-bool CIntHeap::inheap(AbstractSearchState* AbstractSearchState) {
-  return (AbstractSearchState->heapindex != 0);
-}
-
-int CIntHeap::getkeyheap(AbstractSearchState* AbstractSearchState) {
-  if (AbstractSearchState->heapindex == 0) {
-    heaperror("GetKey: AbstractSearchState is not in heap");
+void Heap::PercolateUp(size_t hole, HeapElement obj) {
+  if (Empty()) {
+    return;
   }
 
-  return heap[AbstractSearchState->heapindex].key;
-}
-
-void CIntHeap::makeemptyheap() {
-  for (int i = 1; i <= currentsize; ++i) {
-    heap[i].heapstate->heapindex = 0;
+  for (; hole > 1 && obj.key < queue_[hole / 2].key; hole /= 2) {
+    queue_[hole] = queue_[hole / 2];
+    queue_[hole].element->set_index(hole);
   }
-  currentsize = 0;
+  queue_[hole] = obj;
+  queue_[hole].element->set_index(hole);
 }
 
-void CIntHeap::makeheap() {
-  for (int i = currentsize / 2; i > 0; i--) {
-    percolatedown(i, heap[i]);
+void Heap::PercolateUpOrDown(size_t hole, HeapElement obj) {
+  if (Empty()) {
+    return;
+  }
+
+  if (hole > 1 && obj.key < queue_[hole / 2].key) {
+    PercolateUp(hole, obj);
+  } else {
+    PercolateDown(hole, obj);
   }
 }
 
-void CIntHeap::growheap() {
-  heapintelement* newheap;
-
-  printf("growing heap size from %d ", allocated);
-
-  allocated = 2 * allocated;
-  if (allocated > HEAPSIZE) {
-    allocated = HEAPSIZE;
+bool Heap::CheckSize() {
+  if (size_ + 1 == HEAPSIZE) {
+    LOG(ERROR) << "The heap is full";
+    return false;
   }
-
-  printf("to %d\n", allocated);
-
-  newheap = new heapintelement[allocated];
-  for (int i = 0; i <= currentsize; ++i) {
-    newheap[i] = heap[i];
+  if (size_ + 1 == capacity_) {
+    Allocate();
   }
-
-  delete[] heap;
-
-  heap = newheap;
+  return true;
 }
 
-void CIntHeap::sizecheck() {
-  if (fullheap()) {
-    heaperror("insertheap: heap is full");
-  } else if (currentsize == allocated - 1) {
-    growheap();
-  }
+void Heap::Allocate() {
+  std::stringstream ss;
+  ss << "growing heap size from " << capacity_ << " to ";
+  capacity_ = std::min(capacity_ * 2, HEAPSIZE);
+
+  VLOG(4) << ss.str() << capacity_;
+  queue_.resize(capacity_);
 }
 
-void CIntHeap::insertheap(AbstractSearchState* AbstractSearchState, int key) {
-  heapintelement tmp;
-  char strTemp[100];
-
-  sizecheck();
-
-  if (AbstractSearchState->heapindex != 0) {
-    heaperror(strTemp);
+void Heap::Insert(SearchStateBase* search_state, int key) {
+  CHECK_EQ(search_state->index(), 0);
+  if (!CheckSize()) {
+    return;
   }
-  tmp.heapstate = AbstractSearchState;
-  tmp.key = key;
-  percolateup(++currentsize, tmp);
+
+  HeapElement obj;
+  obj.element = search_state;
+  obj.key = key;
+  PercolateUp(++size_, obj);
 }
 
-void CIntHeap::deleteheap(AbstractSearchState* AbstractSearchState) {
-  if (AbstractSearchState->heapindex == 0) {
-    heaperror("deleteheap: AbstractSearchState is not in heap");
-  }
-  percolateupordown(AbstractSearchState->heapindex, heap[currentsize--]);
-  AbstractSearchState->heapindex = 0;
-}
-
-void CIntHeap::updateheap(AbstractSearchState* AbstractSearchState,
-                          int NewKey) {
-  if (AbstractSearchState->heapindex == 0) {
-    heaperror("Updateheap: AbstractSearchState is not in heap");
-  }
-  if (heap[AbstractSearchState->heapindex].key != NewKey) {
-    heap[AbstractSearchState->heapindex].key = NewKey;
-    percolateupordown(AbstractSearchState->heapindex,
-                      heap[AbstractSearchState->heapindex]);
-  }
-}
-
-AbstractSearchState* CIntHeap::getminheap() {
-  if (currentsize == 0) {
-    heaperror("GetMinheap: heap is empty");
-  }
-  return heap[1].heapstate;
-}
-
-AbstractSearchState* CIntHeap::getminheap(int* ReturnKey) {
-  if (currentsize == 0) {
-    heaperror("GetMinheap: heap is empty");
-  }
-  *ReturnKey = heap[1].key;
-  return heap[1].heapstate;
-}
-
-int CIntHeap::getminkeyheap() {
-  int ReturnKey;
-  if (currentsize == 0) {
+int Heap::GetMinKey() const {
+  if (Empty()) {
     return INFINITECOST;
   }
-  ReturnKey = heap[1].key;
-  return ReturnKey;
+  return queue_[1].key;
 }
 
-AbstractSearchState* CIntHeap::deleteminheap() {
-  AbstractSearchState* AbstractSearchState;
+SearchStateBase* Heap::Pop() {
+  CHECK(!Empty());
 
-  if (currentsize == 0) {
-    heaperror("DeleteMin: heap is empty");
+  SearchStateBase* obj = queue_[1].element;
+  obj->set_index(0);
+  PercolateDown(1, queue_[size_--]);
+  return obj;
+}
+
+void Heap::Update(SearchStateBase* search_state, int new_key) {
+  CHECK_NE(search_state->index(), 0);
+
+  if (queue_[search_state->index()].key != new_key) {
+    queue_[search_state->index()].key = new_key;
+    PercolateUpOrDown(search_state->index(), queue_[search_state->index()]);
   }
-
-  AbstractSearchState = heap[1].heapstate;
-  AbstractSearchState->heapindex = 0;
-  percolatedown(1, heap[currentsize--]);
-  return AbstractSearchState;
 }
 
 }  // namespace voronoi_planner

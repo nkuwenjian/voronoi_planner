@@ -32,8 +32,10 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -47,23 +49,26 @@ struct VoronoiData {
   double dist;
 };
 
-class Grid2DSearchState : public AbstractSearchState {
+class Grid2DSearchState : public SearchStateBase {
  public:
-  /**
-   * \brief coordinates
-   */
-  int x, y;
+  Grid2DSearchState(int x, int y) : x_(x), y_(y) {}
+  ~Grid2DSearchState() override = default;
 
-  /**
-   * \brief search relevant data
-   */
-  int g;
+  int x() const { return x_; }
+  int y() const { return y_; }
+  int g() const { return g_; }
+  const Grid2DSearchState* predecessor() const { return predecessor_; }
+  void set_x(const int x) { x_ = x; }
+  void set_y(const int y) { y_ = y; }
+  void set_g(const int g) { g_ = g; }
+  void set_predecessor(const Grid2DSearchState* predecessor) {
+    predecessor_ = predecessor;
+  }
 
-  Grid2DSearchState* predecessor;
-
- public:
-  Grid2DSearchState() = default;
-  virtual ~Grid2DSearchState() = default;
+  int x_ = 0;
+  int y_ = 0;
+  int g_ = INFINITECOST;
+  const Grid2DSearchState* predecessor_ = nullptr;
 };
 
 class VoronoiPlanner {
@@ -71,7 +76,7 @@ class VoronoiPlanner {
   VoronoiPlanner();
   ~VoronoiPlanner();
 
-  bool search(int start_x, int start_y, int goal_x, int goal_y, int* path_cost,
+  bool Search(int start_x, int start_y, int goal_x, int goal_y, int* path_cost,
               std::vector<std::pair<int, int>>* path, int size_x, int size_y,
               VoronoiData** voronoi_diagram, double circumscribed_radius);
 
@@ -89,36 +94,33 @@ class VoronoiPlanner {
 
  private:
   bool WithinSearchSpace(int x, int y) const {
-    if (x < 0 || x >= size_x_ || y < 0 || y >= size_y_) {
-      return false;
-    }
-    return true;
+    return (x >= 0 && x < size_x_ && y >= 0 && y < size_y_);
   }
 
-  int index(int x, int y) const { return x + y * size_x_; }
+  int Index(int x, int y) const { return x + y * size_x_; }
 
-  int heuristic(int x, int y, int goal_x, int goal_y) const {
+  static int Heuristic(int x, int y, int goal_x, int goal_y) {
     return 10 * std::max(abs(x - goal_x), abs(y - goal_y));
   }
 
   void CreateSearchSpace();
   void ReInitializeSearchSpace();
   void InitializeSearchState(Grid2DSearchState* search_state);
-  void computedxy();
-  void destroy();
+  void Computedxy();
+  void Clear();
 
  private:
   int size_x_ = 0;
   int size_y_ = 0;
-  Grid2DSearchState** search_space_ = nullptr;
-  CIntHeap* open_list_ = nullptr;
+  std::vector<std::vector<Grid2DSearchState*>> search_space_;
+  std::unique_ptr<Heap> open_list_ = nullptr;
 
   // largest optimal g-value computed by search
   int largestcomputedoptf_ = 0;
 
-  int dx_[8];
-  int dy_[8];
-  int dxy_cost_[8];
+  std::array<int, 8> dx_;
+  std::array<int, 8> dy_;
+  std::array<int, 8> dxy_cost_;
   bool use_heuristic_ = true;
 };
 

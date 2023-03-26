@@ -5,7 +5,7 @@ project(voronoi_planner)
 add_compile_options(-std=c++14)
 
 set(CMAKE_BUILD_TYPE Release)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall")
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -23,7 +23,14 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES voronoi_planner
-  CATKIN_DEPENDS costmap_2d geometry_msgs nav_core nav_msgs pluginlib roscpp voronoi_layer
+  CATKIN_DEPENDS
+    costmap_2d
+    geometry_msgs
+    nav_core
+    nav_msgs
+    pluginlib
+    roscpp
+    voronoi_layer
 )
 
 include_directories(

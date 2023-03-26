@@ -29,75 +29,54 @@
 
 #pragma once
 
-#include <cstdio>
-#include <stdexcept>
+#include <vector>
 
-// the maximum size of the heap
-#define HEAPSIZE 20000000
-#define HEAPSIZE_INIT 5000
+const size_t HEAPSIZE = 20000000;
+const size_t HEAPSIZE_INIT = 5000;
 #define INFINITECOST 1000000000
 
 namespace voronoi_planner {
-/**
- * \brief base class for a search state
- */
-class AbstractSearchState {
+class SearchStateBase {
  public:
-  /**
-   * \brief index of the state in the heap, typically used for membership in
-   * OPEN
-   */
-  int heapindex;
+  SearchStateBase() = default;
+  virtual ~SearchStateBase() = default;
 
- public:
-  AbstractSearchState() = default;
-  virtual ~AbstractSearchState() = default;
+  size_t index() const { return index_; }
+  void set_index(const size_t index) { index_ = index; }
+
+  size_t index_ = 0;
 };
 
-struct HEAPINTELEMENT {
-  AbstractSearchState* heapstate = nullptr;
-  int key;
+struct HeapElement {
+  SearchStateBase* element = nullptr;
+  int key = 0;
 };
 
-typedef struct HEAPINTELEMENT heapintelement;
-
-class CIntHeap {
-  // data
+class Heap {
  public:
-  int percolates;  // for counting purposes
-  heapintelement* heap;
-  int currentsize;
-  int allocated;
+  Heap();
+  explicit Heap(size_t capacity);
+  virtual ~Heap();
 
-  // constructors
- public:
-  CIntHeap();
-  explicit CIntHeap(int initial_size);
-  ~CIntHeap();
-
-  // functions
- public:
-  bool emptyheap();
-  bool fullheap();
-  bool inheap(AbstractSearchState* AbstractSearchState);
-  int getkeyheap(AbstractSearchState* AbstractSearchState);
-  void makeemptyheap();
-  void insertheap(AbstractSearchState* AbstractSearchState, int key);
-  void deleteheap(AbstractSearchState* AbstractSearchState);
-  void updateheap(AbstractSearchState* AbstractSearchState, int NewKey);
-  AbstractSearchState* getminheap();
-  AbstractSearchState* getminheap(int* ReturnKey);
-  int getminkeyheap();
-  AbstractSearchState* deleteminheap();
-  void makeheap();
+  size_t Size() const { return size_; }
+  bool Empty() const { return size_ == 0; }
+  void Clear();
+  void Insert(SearchStateBase* search_state, int key);
+  void Update(SearchStateBase* search_state, int new_key);
+  int GetMinKey() const;
+  SearchStateBase* Pop();
 
  private:
-  void percolatedown(int hole, heapintelement tmp);
-  void percolateup(int hole, heapintelement tmp);
-  void percolateupordown(int hole, heapintelement tmp);
+  void PercolateUp(size_t hole, HeapElement obj);
+  void PercolateDown(size_t hole, HeapElement obj);
+  void PercolateUpOrDown(size_t hole, HeapElement obj);
+  bool CheckSize();
+  void Allocate();
 
-  void growheap();
-  void sizecheck();
+ public:
+  size_t size_ = 0;
+  size_t capacity_ = HEAPSIZE_INIT;
+  std::vector<HeapElement> queue_;
 };
 
 }  // namespace voronoi_planner
