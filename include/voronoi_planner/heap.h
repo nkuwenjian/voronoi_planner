@@ -36,6 +36,7 @@ const size_t HEAPSIZE_INIT = 5000;
 #define INFINITECOST 1000000000
 
 namespace voronoi_planner {
+
 class SearchStateBase {
  public:
   SearchStateBase() = default;

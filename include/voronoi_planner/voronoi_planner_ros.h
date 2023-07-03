@@ -42,9 +42,9 @@
 
 #include "voronoi_planner/voronoi_planner.h"
 
-#define CONTXY2DISC(X, CELLSIZE)               \
+#define CONTXY2DISC(X, CELLSIZE)                   \
   (((X) >= 0) ? (static_cast<int>((X) / CELLSIZE)) \
-            : (static_cast<int>((X) / CELLSIZE) - 1))
+              : (static_cast<int>((X) / CELLSIZE) - 1))
 #define DISCXY2CONT(X, CELLSIZE) ((X) * (CELLSIZE) + (CELLSIZE) / 2.0)
 
 namespace voronoi_planner {

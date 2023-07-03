@@ -20,6 +20,8 @@ find_package(catkin REQUIRED COMPONENTS
   voronoi_layer
 )
 
+find_package(glog REQUIRED)
+
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES voronoi_planner
@@ -38,9 +40,9 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_library(${PROJECT_NAME}
+add_library(voronoi_planner
   src/heap.cpp
   src/voronoi_planner_ros.cpp
   src/voronoi_planner.cpp
 )
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
+target_link_libraries(voronoi_planner ${catkin_LIBRARIES} glog::glog)
