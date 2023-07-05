@@ -3,7 +3,21 @@ This repo contains a global planner plugin for ROS navigation stack, in which A*
 
 ## How to use?
 
-### 1. Clone and build voronoi_layer and voronoi_planner
+### 1. Preliminary
+
+Install Google glog. The version of v0.5.0 is tested.
+```
+$ sudo apt install autoconf automake libtool libunwind-dev
+$ git clone https://github.com/google/glog.git
+$ cd glog
+$ git checkout v0.5.0
+$ mkdir build
+$ cmake ..
+$ make -j4
+$ sudo make install
+```
+
+### 2. Clone and build voronoi_layer and voronoi_planner
 ```
 $ cd ~/catkin_ws/src/
 $ git clone https://github.com/nkuwenjian/voronoi_layer.git
@@ -12,7 +26,7 @@ $ cd ../
 $ catkin_make -DCMAKE_BUILD_TYPE=Release
 ```
 
-### 2. Setup the configurations for ROS navigation stack
+### 3. Setup the configurations for ROS navigation stack
 
 In the move_base launch file, use voronoi_planner to override the default global planner, which may like this:
 ```
