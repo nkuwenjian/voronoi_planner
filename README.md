@@ -9,9 +9,10 @@ Install Google glog. The version of v0.5.0 is tested.
 ```
 $ sudo apt install autoconf automake libtool libunwind-dev
 $ git clone https://github.com/google/glog.git
-$ cd glog
+$ cd glog/
 $ git checkout v0.5.0
 $ mkdir build
+$ cd build/
 $ cmake ..
 $ make -j4
 $ sudo make install
