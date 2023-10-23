@@ -120,9 +120,9 @@ bool VoronoiPlannerROS::makePlan(
         boost::dynamic_pointer_cast<costmap_2d::VoronoiLayer>(*layer);
     if (voronoi_layer) {
       has_voronoi_layer = true;
-      boost::unique_lock<boost::mutex> lock(voronoi_layer->getMutex());
+      std::lock_guard<std::mutex> lock(voronoi_layer->mutex());
 
-      const DynamicVoronoi& voronoi = voronoi_layer->getVoronoi();
+      const DynamicVoronoi& voronoi = voronoi_layer->voronoi();
       for (unsigned int j = 0; j < size_y; j++) {
         for (unsigned int i = 0; i < size_x; i++) {
           voronoi_diagram_[i][j].dist =
