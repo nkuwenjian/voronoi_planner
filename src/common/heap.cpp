@@ -27,66 +27,64 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "voronoi_planner/heap.h"
+#include "voronoi_planner/common/heap.h"
 
 #include "glog/logging.h"
 
 namespace voronoi_planner {
+namespace common {
 
 Heap::Heap() { queue_.resize(capacity_); }
 
-Heap::Heap(const size_t capacity) : capacity_(capacity) {
+Heap::Heap(const int capacity) : capacity_(capacity) {
   queue_.resize(capacity);
 }
 
 Heap::~Heap() { Clear(); }
 
 void Heap::Clear() {
-  for (size_t i = 1; i <= size_; i++) {
-    queue_[i].element->set_index(0);
+  for (int i = 1; i <= size_; ++i) {
+    queue_[i].node->set_heap_index(0);
   }
   size_ = 0;
 }
 
-void Heap::PercolateDown(size_t hole, HeapElement obj) {
-  if (Empty()) {
-    return;
-  }
+void Heap::PercolateDown(int hole, HeapElement obj) {
+  // Sanity checks.
+  CHECK(!Empty());
 
-  size_t child;
+  int child;
   for (; 2 * hole <= size_; hole = child) {
     child = 2 * hole;
     if (child != size_ && queue_[child + 1].key < queue_[child].key) {
-      child++;
+      ++child;
     }
     if (queue_[child].key < obj.key) {
       queue_[hole] = queue_[child];
-      queue_[hole].element->set_index(hole);
+      queue_[hole].node->set_heap_index(hole);
     } else {
       break;
     }
   }
   queue_[hole] = obj;
-  queue_[hole].element->set_index(hole);
+  queue_[hole].node->set_heap_index(hole);
 }
 
-void Heap::PercolateUp(size_t hole, HeapElement obj) {
-  if (Empty()) {
-    return;
-  }
+void Heap::PercolateUp(int hole, HeapElement obj) {
+  // Sanity checks.
+  CHECK(!Empty());
 
   for (; hole > 1 && obj.key < queue_[hole / 2].key; hole /= 2) {
     queue_[hole] = queue_[hole / 2];
-    queue_[hole].element->set_index(hole);
+    queue_[hole].node->set_heap_index(hole);
   }
   queue_[hole] = obj;
-  queue_[hole].element->set_index(hole);
+  queue_[hole].node->set_heap_index(hole);
 }
 
-void Heap::PercolateUpOrDown(size_t hole, HeapElement obj) {
-  if (Empty()) {
-    return;
-  }
+void Heap::PercolateUpOrDown(int hole, HeapElement obj) {
+  // Sanity checks.
+  CHECK(!Empty());
 
   if (hole > 1 && obj.key < queue_[hole / 2].key) {
     PercolateUp(hole, obj);
@@ -95,61 +93,60 @@ void Heap::PercolateUpOrDown(size_t hole, HeapElement obj) {
   }
 }
 
-bool Heap::CheckSize() {
-  if (size_ + 1 == HEAPSIZE) {
-    LOG(ERROR) << "The heap is full";
-    return false;
-  }
-  if (size_ + 1 == capacity_) {
-    Allocate();
-  }
-  return true;
-}
-
 void Heap::Allocate() {
   std::stringstream ss;
-  ss << "growing heap size from " << capacity_ << " to ";
-  capacity_ = std::min(capacity_ * 2, HEAPSIZE);
-
-  VLOG(4) << ss.str() << capacity_;
+  ss << "Growing heap size from " << capacity_ << " to ";
+  capacity_ *= 2;
   queue_.resize(capacity_);
+  VLOG(4) << ss.str() << capacity_;
 }
 
-void Heap::Insert(SearchStateBase* search_state, int key) {
-  CHECK_EQ(search_state->index(), 0);
-  if (!CheckSize()) {
+void Heap::Insert(Node* node, int key) {
+  // Sanity checks.
+  if (node->heap_index() != 0) {
+    LOG(ERROR) << "The node is already in the heap";
     return;
   }
 
-  HeapElement obj;
-  obj.element = search_state;
-  obj.key = key;
-  PercolateUp(++size_, obj);
-}
-
-int Heap::GetMinKey() const {
-  if (Empty()) {
-    return INFINITECOST;
+  if (size_ + 1 == capacity_) {
+    Allocate();
   }
-  return queue_[1].key;
+
+  HeapElement obj;
+  obj.node = node;
+  obj.key = key;
+  ++size_;
+  PercolateUp(size_, obj);
 }
 
-SearchStateBase* Heap::Pop() {
-  CHECK(!Empty());
+Node* Heap::Pop() {
+  // Sanity checks.
+  if (Empty()) {
+    LOG(ERROR) << "The heap is empty";
+    return nullptr;
+  }
 
-  SearchStateBase* obj = queue_[1].element;
-  obj->set_index(0);
-  PercolateDown(1, queue_[size_--]);
+  Node* obj = queue_[1].node;
+  obj->set_heap_index(0);
+  if (size_ > 1) {
+    PercolateDown(1, queue_[size_]);
+  }
+  --size_;
   return obj;
 }
 
-void Heap::Update(SearchStateBase* search_state, int new_key) {
-  CHECK_NE(search_state->index(), 0);
+void Heap::Update(Node* node, int new_key) {
+  // Sanity checks.
+  if (node->heap_index() == 0) {
+    LOG(ERROR) << "The node is not in the heap";
+    return;
+  }
 
-  if (queue_[search_state->index()].key != new_key) {
-    queue_[search_state->index()].key = new_key;
-    PercolateUpOrDown(search_state->index(), queue_[search_state->index()]);
+  if (queue_[node->heap_index()].key != new_key) {
+    queue_[node->heap_index()].key = new_key;
+    PercolateUpOrDown(node->heap_index(), queue_[node->heap_index()]);
   }
 }
 
+}  // namespace common
 }  // namespace voronoi_planner

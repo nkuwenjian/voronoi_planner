@@ -41,7 +41,7 @@ include_directories(
 )
 
 add_library(voronoi_planner
-  src/heap.cpp
+  src/common/heap.cpp
   src/voronoi_planner_ros.cpp
   src/voronoi_planner.cpp
 )

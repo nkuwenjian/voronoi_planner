@@ -36,352 +36,393 @@
 
 #include "glog/logging.h"
 
-#include "voronoi_planner/util.h"
+#include "voronoi_planner/common/heap.h"
 
 namespace voronoi_planner {
 
-VoronoiPlanner::VoronoiPlanner() {
-  // compute dx, dy, dxintersects and dyintersects arrays
-  Computedxy();
+VoronoiPlanner::VoronoiPlanner(int max_grid_x, int max_grid_y)
+    : max_grid_x_(max_grid_x), max_grid_y_(max_grid_y) {
+  open_list_ = std::make_unique<common::Heap>();
+
+  dp_lookup_table_.resize(max_grid_x_);
+  for (int grid_x = 0; grid_x < max_grid_x; ++grid_x) {
+    for (int grid_y = 0; grid_y < max_grid_y; ++grid_y) {
+      dp_lookup_table_[grid_x].emplace_back(grid_x, grid_y);
+    }
+  }
+
+  ComputeGridSearchActions();
 }
 
-VoronoiPlanner::~VoronoiPlanner() { Clear(); }
+VoronoiPlanner::~VoronoiPlanner() { open_list_->Clear(); }
 
 void VoronoiPlanner::Clear() {
-  if (open_list_ != nullptr) {
-    open_list_->Clear();
-  }
+  // clean up heap elements in open list
+  open_list_->Clear();
 
-  for (int y = 0; y < size_y_; y++) {
-    for (int x = 0; x < size_x_; x++) {
-      delete search_space_[x][y];
-    }
-  }
+  // clear closed list
+  closed_list_.clear();
+  closed_list_.resize(max_grid_x_ * max_grid_y_, common::NodeStatus::OPEN);
+
+  start_node_ = nullptr;
+  end_node_ = nullptr;
 }
 
-void VoronoiPlanner::InitializeSearchState(Grid2DSearchState* search_state) {
-  search_state->set_g(INFINITECOST);
-  search_state->set_index(0);
-  search_state->set_predecessor(nullptr);
+bool VoronoiPlanner::IsWithinMap(const int grid_x, const int grid_y) const {
+  return grid_x >= 0 && grid_x < max_grid_x_ && grid_y >= 0 &&
+         grid_y < max_grid_y_;
 }
 
-void VoronoiPlanner::CreateSearchSpace() {
-  search_space_.clear();
-  search_space_.resize(size_x_);
-  for (int x = 0; x < size_x_; x++) {
-    search_space_[x].resize(size_y_);
-    for (int y = 0; y < size_y_; y++) {
-      search_space_[x][y] = new Grid2DSearchState(x, y);
-      InitializeSearchState(search_space_[x][y]);
-    }
-  }
-}
-
-void VoronoiPlanner::ReInitializeSearchSpace() {
-  for (int x = 0; x < size_x_; x++) {
-    for (int y = 0; y < size_y_; y++) {
-      InitializeSearchState(search_space_[x][y]);
-    }
-  }
-}
-
-void VoronoiPlanner::Computedxy() {
-  // initialize some constants for 2D search
-  dx_[0] = 1;
-  dy_[0] = 1;
-  dx_[1] = 1;
-  dy_[1] = 0;
-  dx_[2] = 1;
-  dy_[2] = -1;
-  dx_[3] = 0;
-  dy_[3] = 1;
-  dx_[4] = 0;
-  dy_[4] = -1;
-  dx_[5] = -1;
-  dy_[5] = 1;
-  dx_[6] = -1;
-  dy_[6] = 0;
-  dx_[7] = -1;
-  dy_[7] = -1;
-
-  // compute distances
-  for (int dind = 0; dind < 8; dind++) {
-    if (dx_[dind] != 0 && dy_[dind] != 0) {
-      dxy_cost_[dind] = 14;
-    } else {
-      dxy_cost_[dind] = 10;
-    }
-  }
-}
-
-bool VoronoiPlanner::Search(int start_x, int start_y, int goal_x, int goal_y,
-                            int* path_cost,
-                            std::vector<std::pair<int, int>>* path, int size_x,
-                            int size_y, VoronoiData** voronoi_diagram,
-                            double circumscribed_radius) {
-  if (size_x != size_x_ || size_y != size_y_) {
-    Clear();
-
-    size_x_ = size_x;
-    size_y_ = size_y;
-
-    if (open_list_ != nullptr) {
-      open_list_.reset();
-    }
-    open_list_ = std::make_unique<Heap>(size_x_ * size_y_);
-    CreateSearchSpace();
-  }
-
-  std::vector<std::pair<int, int>> path1, path2, path3;
-  int path_cost1, path_cost2, path_cost3;
-  int voronoi_start_x, voronoi_start_y;
-  if (!SearchShortestPathToVoronoi(
-          start_x, start_y, goal_x, goal_y, &voronoi_start_x, &voronoi_start_y,
-          &path_cost1, &path1, voronoi_diagram, circumscribed_radius)) {
-    LOG(ERROR) << "Failed to fine the path from start to voronoi";
-    return false;
-  }
-  std::reverse(path1.begin(), path1.end());
-
-  if (voronoi_start_x == goal_x && voronoi_start_y == goal_y) {
-    path->clear();
-    *path = path1;
-    *path_cost = path_cost1;
+bool VoronoiPlanner::CheckVoronoi(int grid_x, int grid_y) const {
+  if (!need_check_voronoi_) {
     return true;
   }
+  return gvd_map_[grid_x][grid_y].is_voronoi;
+}
 
-  int voronoi_goal_x, voronoi_goal_y;
-  if (!SearchShortestPathToVoronoi(
-          goal_x, goal_y, start_x, start_y, &voronoi_goal_x, &voronoi_goal_y,
-          &path_cost3, &path3, voronoi_diagram, circumscribed_radius)) {
-    LOG(ERROR) << "Failed to the find the path from voronoi to goal";
+int VoronoiPlanner::CalcGridXYIndex(const int grid_x, const int grid_y) const {
+  DCHECK(IsWithinMap(grid_x, grid_y));
+  return grid_x + grid_y * max_grid_x_;
+}
+
+int VoronoiPlanner::GetKey(const Node2d* node) const {
+  CHECK_NOTNULL(node);
+  return search_type_ == SearchType::A_STAR ? node->g() + node->h() : node->g();
+}
+
+bool VoronoiPlanner::SetStart(const int start_x, const int start_y) {
+  if (!IsValidCell(start_x, start_y)) {
     return false;
   }
-
-  if (voronoi_goal_x == start_x && voronoi_goal_y == start_y) {
-    path->clear();
-    *path = path3;
-    *path_cost = path_cost3;
-    return true;
-  }
-
-  if (!SearchInVoronoi(voronoi_start_x, voronoi_start_y, voronoi_goal_x,
-                       voronoi_goal_y, &path_cost2, &path2, voronoi_diagram,
-                       circumscribed_radius)) {
-    LOG(ERROR) << "Failed to find the path from voronoi start to voronoi goal";
-    return false;
-  }
-
-  path1.insert(path1.end(), path2.begin(), path2.end());
-  path1.insert(path1.end(), path3.begin(), path3.end());
-
-  path->clear();
-  *path = path1;
-  *path_cost = path_cost1 + path_cost2 + path_cost3;
+  start_node_ = GetNode(start_x, start_y);
   return true;
 }
 
-bool VoronoiPlanner::SearchInVoronoi(int start_x, int start_y, int goal_x,
-                                     int goal_y, int* path_cost,
-                                     std::vector<std::pair<int, int>>* path,
-                                     VoronoiData** voronoi_diagram,
-                                     double circumscribed_radius) {
-  UNUSED(path_cost);
+bool VoronoiPlanner::SetEnd(const int end_x, const int end_y) {
+  if (!IsValidCell(end_x, end_y)) {
+    return false;
+  }
+  end_node_ = GetNode(end_x, end_y);
+  return true;
+}
+
+Node2d* VoronoiPlanner::GetNode(const int grid_x, const int grid_y) {
+  DCHECK(IsWithinMap(grid_x, grid_y));
+  Node2d* node = &dp_lookup_table_[grid_x][grid_y];
+  if (node->iterations() != iterations_) {
+    node->set_h(CalcHeuCost(grid_x, grid_y));
+    node->set_g(common::kInfiniteCost);
+    node->set_pre_node(nullptr);
+    node->set_heap_index(0);
+    node->set_iterations(iterations_);
+  }
+  return node;
+}
+
+bool VoronoiPlanner::IsValidCell(const int grid_x, const int grid_y) const {
+  if (!IsWithinMap(grid_x, grid_y)) {
+    return false;
+  }
+  if (gvd_map_[grid_x][grid_y].dist < circumscribed_radius_) {
+    return false;
+  }
+  return true;
+}
+
+int VoronoiPlanner::CalcHeuCost(const int grid_x, const int grid_y) const {
+  if (end_node_ == nullptr) {
+    return 0;
+  }
+  return 10 * std::max(std::abs(grid_x - end_node_->grid_x()),
+                       std::abs(grid_y - end_node_->grid_y()));
+}
+
+bool VoronoiPlanner::SetStartAndEndConfiguration(int sx, int sy, int ex,
+                                                 int ey) {
+  if (!SetStart(sx, sy)) {
+    LOG(ERROR) << "VoronoiPlanner is called on invalid start (" << sx << ","
+               << sy << ")";
+    return false;
+  }
+  CHECK_NOTNULL(start_node_);
+  // since the goal has not been set yet, the start node's h value is set to 0
+  CHECK_EQ(start_node_->h(), 0);
+
+  if (!SetEnd(ex, ey)) {
+    LOG(ERROR) << "VoronoiPlanner is called on invalid end (" << ex << "," << ey
+               << ")";
+    return false;
+  }
+  CHECK_NOTNULL(end_node_);
+  CHECK_EQ(end_node_->h(), 0);
+  return true;
+}
+
+void VoronoiPlanner::ComputeGridSearchActions() {
+  // initialize some constants for 2D search
+  actions_.dx[0] = 1;
+  actions_.dy[0] = 1;
+  actions_.dx[1] = 1;
+  actions_.dy[1] = 0;
+  actions_.dx[2] = 1;
+  actions_.dy[2] = -1;
+  actions_.dx[3] = 0;
+  actions_.dy[3] = 1;
+  actions_.dx[4] = 0;
+  actions_.dy[4] = -1;
+  actions_.dx[5] = -1;
+  actions_.dy[5] = 1;
+  actions_.dx[6] = -1;
+  actions_.dy[6] = 0;
+  actions_.dx[7] = -1;
+  actions_.dy[7] = -1;
+
+  // compute distances
+  for (int dind = 0; dind < common::kNumOfGridSearchActions; dind++) {
+    if (actions_.dx[dind] != 0 && actions_.dy[dind] != 0) {
+      actions_.dxy_cost[dind] = 14;
+    } else {
+      actions_.dxy_cost[dind] = 10;
+    }
+  }
+}
+
+bool VoronoiPlanner::Search(int sx, int sy, int ex, int ey,
+                            std::vector<std::vector<VoronoiData>>&& gvd_map,
+                            double circumscribed_radius,
+                            std::vector<std::pair<int, int>>* path) {
+  // Sanity checks.
+  CHECK_NOTNULL(path);
+
   const auto start_timestamp = std::chrono::system_clock::now();
 
-  ReInitializeSearchSpace();
-  open_list_->Clear();
+  gvd_map_ = std::move(gvd_map);
+  circumscribed_radius_ = circumscribed_radius;
 
-  Grid2DSearchState* search_exp_state = nullptr;
-  Grid2DSearchState* search_succ_state = nullptr;
-  Grid2DSearchState* search_goal_state = search_space_[goal_x][goal_y];
-  int key;
-
-  search_exp_state = search_space_[start_x][start_y];
-  search_exp_state->set_g(0);
-  key = search_exp_state->g();
-  if (use_heuristic_) {
-    key = key + Heuristic(start_x, start_y, goal_x, goal_y);
+  // Find grid path from start to Voronoi edges.
+  int voronoi_start_x = 0;
+  int voronoi_start_y = 0;
+  GridSearchResult result1;
+  if (!SearchPathToVoronoiEdges(sx, sy, ex, ey, &voronoi_start_x,
+                                &voronoi_start_y, &result1)) {
+    LOG(ERROR) << "Failed to find grid path from start to Voronoi edges.";
+    return false;
   }
 
-  open_list_->Insert(search_exp_state, key);
-
-  int num_of_expands = 0;
-  std::vector<unsigned char> closed_list(size_x_ * size_y_, 0);
-
-  while (!open_list_->Empty() &&
-         search_goal_state->g() > open_list_->GetMinKey()) {
-    search_exp_state = dynamic_cast<Grid2DSearchState*>(open_list_->Pop());
-    CHECK_NOTNULL(search_exp_state);
-
-    int exp_x = search_exp_state->x();
-    int exp_y = search_exp_state->y();
-    num_of_expands++;
-    // close the state
-    closed_list[exp_x + size_x_ * exp_y] = 1;
-
-    for (int dir = 0; dir < 8; dir++) {
-      int new_x = exp_x + dx_[dir];
-      int new_y = exp_y + dy_[dir];
-
-      if (!WithinSearchSpace(new_x, new_y)) {
-        continue;
-      }
-
-      if (closed_list[new_x + size_x_ * new_y] == 1) {
-        continue;
-      }
-
-      if (!voronoi_diagram[new_x][new_y].is_voronoi) {
-        continue;
-      }
-
-      double dist = voronoi_diagram[new_x][new_y].dist;
-      if (dist < circumscribed_radius) {
-        continue;
-      }
-
-      int cost = dxy_cost_[dir];
-
-      search_succ_state = search_space_[new_x][new_y];
-      if (search_succ_state->g() > search_exp_state->g() + cost) {
-        search_succ_state->set_g(search_exp_state->g() + cost);
-        search_succ_state->set_predecessor(search_exp_state);
-
-        key = search_succ_state->g();
-        if (use_heuristic_) {
-          key = key + Heuristic(new_x, new_y, goal_x, goal_y);
-        }
-        if (search_succ_state->index() == 0) {
-          open_list_->Insert(search_succ_state, key);
-        } else {
-          open_list_->Update(search_succ_state, key);
-        }
-      }
-    }  // over successors
-  }    // while
-
-  // set lower bounds for the remaining states
-  if (!open_list_->Empty()) {
-    largestcomputedoptf_ = open_list_->GetMinKey();
-  } else {
-    largestcomputedoptf_ = INFINITECOST;
+  if (voronoi_start_x == ex && voronoi_start_y == ey) {
+    *path = result1.grid_path;
+    return true;
   }
+
+  // Find grid path from end to Voronoi edges.
+  int voronoi_goal_x = 0;
+  int voronoi_goal_y = 0;
+  GridSearchResult result2;
+  if (!SearchPathToVoronoiEdges(ex, ey, sx, sy, &voronoi_goal_x,
+                                &voronoi_goal_y, &result2)) {
+    LOG(ERROR) << "Failed to find grid path from end to Voronoi edges.";
+    return false;
+  }
+  std::reverse(result2.grid_path.begin(), result2.grid_path.end());
+
+  if (voronoi_goal_x == sx && voronoi_goal_y == sy) {
+    *path = result2.grid_path;
+    return true;
+  }
+
+  // Find grid path along Voronoi edges.
+  GridSearchResult result3;
+  if (!SearchPathAlongVoronoiEdges(voronoi_start_x, voronoi_start_y,
+                                   voronoi_goal_x, voronoi_goal_y, &result3)) {
+    LOG(ERROR) << "Failed to find grid path along Voronoi edges.";
+    return false;
+  }
+
+  path->clear();
+  path->insert(path->end(), std::make_move_iterator(result1.grid_path.begin()),
+               std::make_move_iterator(result1.grid_path.end()));
+  path->insert(path->end(), std::make_move_iterator(result3.grid_path.begin()),
+               std::make_move_iterator(result3.grid_path.end()));
+  path->insert(path->end(), std::make_move_iterator(result2.grid_path.begin()),
+               std::make_move_iterator(result2.grid_path.end()));
 
   const auto end_timestamp = std::chrono::system_clock::now();
   const std::chrono::duration<double> diff = end_timestamp - start_timestamp;
-  LOG(INFO) << "Time used to search voronoi path: " << diff.count() * 1e3
-            << " ms.";
-
-  path->clear();
-  const Grid2DSearchState* search_pred_state = search_goal_state;
-  path->emplace_back(search_pred_state->x(), search_pred_state->y());
-  while (search_pred_state->predecessor() != nullptr) {
-    search_pred_state = search_pred_state->predecessor();
-    path->emplace_back(search_pred_state->x(), search_pred_state->y());
-  }
-  std::reverse(path->begin(), path->end());
+  LOG(INFO) << std::fixed << "Total time used to search Voronoi grid path: "
+            << diff.count() * 1e3 << " ms.";
 
   return true;
 }
 
-bool VoronoiPlanner::SearchShortestPathToVoronoi(
-    int start_x, int start_y, int goal_x, int goal_y, int* voronoi_goal_x,
-    int* voronoi_goal_y, int* path_cost, std::vector<std::pair<int, int>>* path,
-    VoronoiData** voronoi_diagram, double circumscribed_radius) {
-  UNUSED(path_cost);
-  if (!WithinSearchSpace(start_x, start_y)) {
-    throw std::runtime_error("the start is out of range");
+bool VoronoiPlanner::SearchPathToVoronoiEdges(int sx, int sy, int ex, int ey,
+                                              int* voronoi_goal_x,
+                                              int* voronoi_goal_y,
+                                              GridSearchResult* result) {
+  const auto start_timestamp = std::chrono::system_clock::now();
+
+  // clean up previous planning result
+  Clear();
+
+  search_type_ = SearchType::DP;
+  need_check_voronoi_ = false;
+
+  ++iterations_;
+
+  if (!SetStartAndEndConfiguration(sx, sy, ex, ey)) {
     return false;
   }
 
-  const auto start_timestamp = std::chrono::system_clock::now();
+  // initialize start node and insert it into heap
+  start_node_->set_g(0);
+  start_node_->set_h(CalcHeuCost(sx, sy));
+  open_list_->Insert(start_node_, GetKey(start_node_));
 
-  ReInitializeSearchSpace();
-  open_list_->Clear();
-
-  Grid2DSearchState* search_exp_state = nullptr;
-  Grid2DSearchState* search_succ_state = nullptr;
-
-  search_exp_state = search_space_[start_x][start_y];
-  search_exp_state->set_g(0);
-  open_list_->Insert(search_exp_state, search_exp_state->g());
-
-  int num_of_expands = 0;
-  std::vector<unsigned char> closed_list(size_x_ * size_y_, 0);
-
+  // grid search begins
+  std::size_t explored_node_num = 0U;
   while (!open_list_->Empty()) {
-    search_exp_state = dynamic_cast<Grid2DSearchState*>(open_list_->Pop());
-    CHECK_NOTNULL(search_exp_state);
+    auto* node = dynamic_cast<Node2d*>(open_list_->Pop());
+    CHECK_NOTNULL(node);
+    CHECK_NE(node->g(), common::kInfiniteCost);
+    closed_list_[CalcGridXYIndex(node->grid_x(), node->grid_y())] =
+        common::NodeStatus::CLOSED;
 
-    int exp_x = search_exp_state->x();
-    int exp_y = search_exp_state->y();
+    int curr_x = node->grid_x();
+    int curr_y = node->grid_y();
 
-    if ((exp_x == goal_x && exp_y == goal_y) ||
-        (voronoi_diagram[exp_x][exp_y].is_voronoi)) {
-      *voronoi_goal_x = exp_x;
-      *voronoi_goal_y = exp_y;
+    if ((curr_x == ex && curr_y == ey) ||
+        (gvd_map_[curr_x][curr_y].is_voronoi)) {
+      *voronoi_goal_x = curr_x;
+      *voronoi_goal_y = curr_y;
       break;
     }
 
-    num_of_expands++;
-    // close the state
-    closed_list[exp_x + size_x_ * exp_y] = 1;
-
-    for (int dir = 0; dir < 8; dir++) {
-      int new_x = exp_x + dx_[dir];
-      int new_y = exp_y + dy_[dir];
-
-      if (!WithinSearchSpace(new_x, new_y)) {
-        continue;
-      }
-
-      if (closed_list[new_x + size_x_ * new_y] == 1) {
-        continue;
-      }
-
-      double dist = voronoi_diagram[new_x][new_y].dist;
-      if (dist < circumscribed_radius) {
-        continue;
-      }
-
-      int cost = dxy_cost_[dir];
-
-      search_succ_state = search_space_[new_x][new_y];
-      if (search_succ_state->g() > search_exp_state->g() + cost) {
-        search_succ_state->set_g(search_exp_state->g() + cost);
-        search_succ_state->set_predecessor(search_exp_state);
-
-        if (search_succ_state->index() == 0) {
-          open_list_->Insert(search_succ_state, search_succ_state->g());
-        } else {
-          open_list_->Update(search_succ_state, search_succ_state->g());
-        }
-      }
-    }  // over successors
-  }    // while
-
-  // set lower bounds for the remaining states
-  if (!open_list_->Empty()) {
-    largestcomputedoptf_ = open_list_->GetMinKey();
-  } else {
-    largestcomputedoptf_ = INFINITECOST;
+    // new expand
+    ++explored_node_num;
+    UpdateSuccs(node);
   }
 
   const auto end_timestamp = std::chrono::system_clock::now();
   const std::chrono::duration<double> diff = end_timestamp - start_timestamp;
+  LOG(INFO) << std::fixed << "Time used to search path to Voronoi edges: "
+            << diff.count() * 1e3 << " ms.";
 
-  path->clear();
-  Grid2DSearchState* search_goal_state =
-      search_space_[*voronoi_goal_x][*voronoi_goal_y];
-  const Grid2DSearchState* search_pred_state = search_goal_state;
-  path->emplace_back(search_pred_state->x(), search_pred_state->y());
-  while (search_pred_state->predecessor() != nullptr) {
-    search_pred_state = search_pred_state->predecessor();
-    path->emplace_back(search_pred_state->x(), search_pred_state->y());
+  LoadGridSearchResult(*voronoi_goal_x, *voronoi_goal_y, result);
+  return true;
+}
+
+bool VoronoiPlanner::SearchPathAlongVoronoiEdges(int sx, int sy, int ex, int ey,
+                                                 GridSearchResult* result) {
+  const auto start_timestamp = std::chrono::system_clock::now();
+
+  // clean up previous planning result
+  Clear();
+
+  search_type_ = SearchType::A_STAR;
+  need_check_voronoi_ = true;
+
+  ++iterations_;
+
+  if (!SetStartAndEndConfiguration(sx, sy, ex, ey)) {
+    return false;
   }
 
+  // initialize start node and insert it into heap
+  start_node_->set_g(0);
+  start_node_->set_h(CalcHeuCost(sx, sy));
+  open_list_->Insert(start_node_, GetKey(start_node_));
+
+  // grid search begins
+  std::size_t explored_node_num = 0U;
+  while (!open_list_->Empty() && end_node_->g() > open_list_->GetMinKey()) {
+    auto* node = dynamic_cast<Node2d*>(open_list_->Pop());
+    CHECK_NOTNULL(node);
+    CHECK_NE(node->g(), common::kInfiniteCost);
+    closed_list_[CalcGridXYIndex(node->grid_x(), node->grid_y())] =
+        common::NodeStatus::CLOSED;
+
+    // new expand
+    ++explored_node_num;
+    UpdateSuccs(node);
+  }
+
+  const auto end_timestamp = std::chrono::system_clock::now();
+  const std::chrono::duration<double> diff = end_timestamp - start_timestamp;
+  LOG(INFO) << std::fixed << "Time used to search path along Voronoi edges: "
+            << diff.count() * 1e3 << " ms.";
+
+  if (end_node_->g() == common::kInfiniteCost) {
+    LOG(ERROR) << "VoronoiPlanner returns infinite cost (open_list run out)";
+    return false;
+  }
+
+  LoadGridSearchResult(end_node_->grid_x(), end_node_->grid_y(), result);
   return true;
+}
+
+void VoronoiPlanner::UpdateSuccs(const Node2d* curr_node) {
+  CHECK_NOTNULL(curr_node);
+  const int curr_x = curr_node->grid_x();
+  const int curr_y = curr_node->grid_y();
+  CHECK(CheckVoronoi(curr_x, curr_y));
+  CHECK(IsValidCell(curr_x, curr_y));
+
+  for (int action_id = 0; action_id < common::kNumOfGridSearchActions;
+       ++action_id) {
+    const int succ_x = curr_x + actions_.dx[action_id];
+    const int succ_y = curr_y + actions_.dy[action_id];
+    if (!IsValidCell(succ_x, succ_y)) {
+      continue;
+    }
+    if (closed_list_[CalcGridXYIndex(succ_x, succ_y)] ==
+        common::NodeStatus::CLOSED) {
+      continue;
+    }
+    if (!CheckVoronoi(succ_x, succ_y)) {
+      continue;
+    }
+    // get action cost
+    int action_cost = GetActionCost(curr_x, curr_y, action_id);
+
+    Node2d* succ_node = GetNode(succ_x, succ_y);
+    // see if we can decrease the value of successive node taking into account
+    // the cost of action
+    if (succ_node->g() > curr_node->g() + action_cost) {
+      succ_node->set_g(curr_node->g() + action_cost);
+      succ_node->set_pre_node(curr_node);
+
+      // re-insert into heap if not closed yet
+      if (succ_node->heap_index() == 0) {
+        open_list_->Insert(succ_node, GetKey(succ_node));
+      } else {
+        open_list_->Update(succ_node, GetKey(succ_node));
+      }
+    }
+  }
+}
+
+int VoronoiPlanner::GetActionCost(int curr_x, int curr_y, int action_id) const {
+  CHECK(IsValidCell(curr_x, curr_y));
+  const int succ_x = curr_x + actions_.dx[action_id];
+  const int succ_y = curr_y + actions_.dy[action_id];
+  CHECK(IsValidCell(succ_x, succ_y));
+  return actions_.dxy_cost[action_id];
+}
+
+void VoronoiPlanner::LoadGridSearchResult(int end_x, int end_y,
+                                          GridSearchResult* result) const {
+  if (result == nullptr) {
+    return;
+  }
+
+  result->path_cost = dp_lookup_table_[end_x][end_y].g();
+  const Node2d* node = &dp_lookup_table_[end_x][end_y];
+  std::vector<std::pair<int, int>> grid_path;
+  while (node != nullptr) {
+    grid_path.emplace_back(node->grid_x(), node->grid_y());
+    node = node->pre_node();
+  }
+  std::reverse(grid_path.begin(), grid_path.end());
+  result->grid_path = std::move(grid_path);
 }
 
 }  // namespace voronoi_planner

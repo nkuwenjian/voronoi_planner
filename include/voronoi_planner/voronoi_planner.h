@@ -40,88 +40,77 @@
 #include <utility>
 #include <vector>
 
-#include "voronoi_planner/heap.h"
+#include "voronoi_planner/common/constants.h"
+#include "voronoi_planner/common/heap.h"
+#include "voronoi_planner/node2d.h"
 
 namespace voronoi_planner {
 
+enum class SearchType : int { A_STAR, DP };
+
 struct VoronoiData {
-  bool is_voronoi;
-  double dist;
+  bool is_voronoi = false;
+  double dist = 0.0;
 };
 
-class Grid2DSearchState : public SearchStateBase {
- public:
-  Grid2DSearchState(int x, int y) : x_(x), y_(y) {}
-  ~Grid2DSearchState() override = default;
+struct GridSearchPrimitives {
+  std::array<int, common::kNumOfGridSearchActions> dx;
+  std::array<int, common::kNumOfGridSearchActions> dy;
+  std::array<int, common::kNumOfGridSearchActions> dxy_cost;
+};
 
-  int x() const { return x_; }
-  int y() const { return y_; }
-  int g() const { return g_; }
-  const Grid2DSearchState* predecessor() const { return predecessor_; }
-  void set_x(const int x) { x_ = x; }
-  void set_y(const int y) { y_ = y; }
-  void set_g(const int g) { g_ = g; }
-  void set_predecessor(const Grid2DSearchState* predecessor) {
-    predecessor_ = predecessor;
-  }
-
-  int x_ = 0;
-  int y_ = 0;
-  int g_ = INFINITECOST;
-  const Grid2DSearchState* predecessor_ = nullptr;
+struct GridSearchResult {
+  std::vector<std::pair<int, int>> grid_path;
+  int path_cost = 0;
 };
 
 class VoronoiPlanner {
  public:
-  VoronoiPlanner();
+  VoronoiPlanner(int max_grid_x, int max_grid_y);
   ~VoronoiPlanner();
 
-  bool Search(int start_x, int start_y, int goal_x, int goal_y, int* path_cost,
-              std::vector<std::pair<int, int>>* path, int size_x, int size_y,
-              VoronoiData** voronoi_diagram, double circumscribed_radius);
+  bool Search(int sx, int sy, int ex, int ey,
+              std::vector<std::vector<VoronoiData>>&& gvd_map,
+              double circumscribed_radius,
+              std::vector<std::pair<int, int>>* path);
 
  private:
-  bool SearchInVoronoi(int start_x, int start_y, int goal_x, int goal_y,
-                       int* path_cost, std::vector<std::pair<int, int>>* path,
-                       VoronoiData** voronoi_diagram,
-                       double circumscribed_radius);
-  bool SearchShortestPathToVoronoi(int start_x, int start_y, int goal_x,
-                                   int goal_y, int* voronoi_goal_x,
-                                   int* voronoi_goal_y, int* path_cost,
-                                   std::vector<std::pair<int, int>>* path,
-                                   VoronoiData** voronoi_diagram,
-                                   double circumscribed_radius);
-
- private:
-  bool WithinSearchSpace(int x, int y) const {
-    return (x >= 0 && x < size_x_ && y >= 0 && y < size_y_);
-  }
-
-  int Index(int x, int y) const { return x + y * size_x_; }
-
-  static int Heuristic(int x, int y, int goal_x, int goal_y) {
-    return 10 * std::max(abs(x - goal_x), abs(y - goal_y));
-  }
-
-  void CreateSearchSpace();
-  void ReInitializeSearchSpace();
-  void InitializeSearchState(Grid2DSearchState* search_state);
-  void Computedxy();
+  bool SetStart(int start_x, int start_y);
+  bool SetEnd(int end_x, int end_y);
+  Node2d* GetNode(int grid_x, int grid_y);
+  bool IsValidCell(int grid_x, int grid_y) const;
+  int CalcHeuCost(int grid_x, int grid_y) const;
+  bool SetStartAndEndConfiguration(int sx, int sy, int ex, int ey);
+  bool IsWithinMap(int grid_x, int grid_y) const;
+  bool CheckVoronoi(int grid_x, int grid_y) const;
+  int CalcGridXYIndex(int grid_x, int grid_y) const;
+  int GetKey(const Node2d* node) const;
+  void UpdateSuccs(const Node2d* curr_node);
+  int GetActionCost(int curr_x, int curr_y, int action_id) const;
+  void LoadGridSearchResult(int end_x, int end_y,
+                            GridSearchResult* result) const;
+  void ComputeGridSearchActions();
   void Clear();
+  bool SearchPathToVoronoiEdges(int sx, int sy, int ex, int ey,
+                                int* voronoi_goal_x, int* voronoi_goal_y,
+                                GridSearchResult* result);
+  bool SearchPathAlongVoronoiEdges(int sx, int sy, int ex, int ey,
+                                   GridSearchResult* result);
 
- private:
-  int size_x_ = 0;
-  int size_y_ = 0;
-  std::vector<std::vector<Grid2DSearchState*>> search_space_;
-  std::unique_ptr<Heap> open_list_ = nullptr;
+  int max_grid_x_ = 0;
+  int max_grid_y_ = 0;
+  std::vector<std::vector<Node2d>> dp_lookup_table_;
+  std::unique_ptr<common::Heap> open_list_ = nullptr;
+  std::vector<common::NodeStatus> closed_list_;
+  double circumscribed_radius_;
+  Node2d* start_node_ = nullptr;
+  Node2d* end_node_ = nullptr;
+  std::vector<std::vector<VoronoiData>> gvd_map_;
 
-  // largest optimal g-value computed by search
-  int largestcomputedoptf_ = 0;
-
-  std::array<int, 8> dx_;
-  std::array<int, 8> dy_;
-  std::array<int, 8> dxy_cost_;
-  bool use_heuristic_ = true;
+  GridSearchPrimitives actions_;
+  SearchType search_type_;
+  bool need_check_voronoi_ = false;
+  std::size_t iterations_ = 0U;
 };
 
 }  // namespace voronoi_planner

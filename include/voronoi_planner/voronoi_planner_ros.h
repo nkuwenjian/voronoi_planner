@@ -31,21 +31,17 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "costmap_2d/costmap_2d_ros.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "nav_core/base_global_planner.h"
 #include "ros/ros.h"
-#include "voronoi_layer/voronoi_layer.h"
 
 #include "voronoi_planner/voronoi_planner.h"
-
-#define CONTXY2DISC(X, CELLSIZE)                   \
-  (((X) >= 0) ? (static_cast<int>((X) / CELLSIZE)) \
-              : (static_cast<int>((X) / CELLSIZE) - 1))
-#define DISCXY2CONT(X, CELLSIZE) ((X) * (CELLSIZE) + (CELLSIZE) / 2.0)
 
 namespace voronoi_planner {
 
@@ -82,22 +78,34 @@ class VoronoiPlannerROS : public nav_core::BaseGlobalPlanner {
                 const geometry_msgs::PoseStamped& goal,
                 std::vector<geometry_msgs::PoseStamped>& plan) override;
 
-  virtual ~VoronoiPlannerROS();
+  virtual ~VoronoiPlannerROS() = default;
 
  private:
-  void publishVoronoiPath(const std::vector<geometry_msgs::PoseStamped>& plan);
-  void destroy();
+  bool UpdateCostmap(costmap_2d::Costmap2DROS* costmap_ros);
+  static void GetStartAndEndConfigurations(
+      const geometry_msgs::PoseStamped& start,
+      const geometry_msgs::PoseStamped& goal, double resolution,
+      double origin_x, double origin_y, int* start_x, int* start_y, int* end_x,
+      int* end_y);
+  std::vector<std::vector<VoronoiData>> GetVoronoiDiagram(unsigned int size_x,
+                                                          unsigned int size_y,
+                                                          double resolution);
+  static void PopulateVoronoiPath(
+      const std::vector<std::pair<int, int>>& searched_result,
+      const std_msgs::Header& header, double resolution, double origin_x,
+      double origin_y, std::vector<geometry_msgs::PoseStamped>* plan);
+  static void PublishVoronoiPath(
+      const std::vector<geometry_msgs::PoseStamped>& plan,
+      const ros::Publisher& pub);
 
  private:
-  VoronoiPlanner* voronoi_planner_ = nullptr;
-  costmap_2d::Costmap2DROS* costmap_ros_ = nullptr;
+  std::unique_ptr<VoronoiPlanner> voronoi_planner_ = nullptr;
+  const costmap_2d::Costmap2DROS* costmap_ros_ = nullptr;
+  const costmap_2d::Costmap2D* costmap_2d_ = nullptr;
+  costmap_2d::LayeredCostmap* layered_costmap_ = nullptr;
   std::string name_;
-  unsigned int last_size_x_ = 0;
-  unsigned int last_size_y_ = 0;
-  VoronoiData** voronoi_diagram_ = nullptr;
 
   ros::Publisher path_pub_;
-
   bool initialized_ = false;
 };
 

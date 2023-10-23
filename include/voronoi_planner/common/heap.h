@@ -31,53 +31,41 @@
 
 #include <vector>
 
-const size_t HEAPSIZE = 20000000;
-const size_t HEAPSIZE_INIT = 5000;
-#define INFINITECOST 1000000000
+#include "voronoi_planner/common/constants.h"
+#include "voronoi_planner/common/node.h"
 
 namespace voronoi_planner {
-
-class SearchStateBase {
- public:
-  SearchStateBase() = default;
-  virtual ~SearchStateBase() = default;
-
-  size_t index() const { return index_; }
-  void set_index(const size_t index) { index_ = index; }
-
-  size_t index_ = 0;
-};
+namespace common {
 
 struct HeapElement {
-  SearchStateBase* element = nullptr;
+  Node* node = nullptr;
   int key = 0;
 };
 
 class Heap {
  public:
   Heap();
-  explicit Heap(size_t capacity);
+  explicit Heap(int capacity);
   virtual ~Heap();
 
-  size_t Size() const { return size_; }
   bool Empty() const { return size_ == 0; }
+  int Size() const { return size_; }
   void Clear();
-  void Insert(SearchStateBase* search_state, int key);
-  void Update(SearchStateBase* search_state, int new_key);
-  int GetMinKey() const;
-  SearchStateBase* Pop();
+  void Insert(Node* node, int key);
+  void Update(Node* node, int new_key);
+  int GetMinKey() const { return Empty() ? kInfiniteCost : queue_[1].key; }
+  Node* Pop();
 
  private:
-  void PercolateUp(size_t hole, HeapElement obj);
-  void PercolateDown(size_t hole, HeapElement obj);
-  void PercolateUpOrDown(size_t hole, HeapElement obj);
-  bool CheckSize();
+  void PercolateUp(int hole, HeapElement obj);
+  void PercolateDown(int hole, HeapElement obj);
+  void PercolateUpOrDown(int hole, HeapElement obj);
   void Allocate();
 
- public:
-  size_t size_ = 0;
-  size_t capacity_ = HEAPSIZE_INIT;
+  int size_ = 0;
+  int capacity_ = kInitHeapCapacity;
   std::vector<HeapElement> queue_;
 };
 
+}  // namespace common
 }  // namespace voronoi_planner

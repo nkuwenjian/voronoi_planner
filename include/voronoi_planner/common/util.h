@@ -33,4 +33,17 @@
 
 #pragma once
 
-#define UNUSED(x) (void)x
+namespace voronoi_planner {
+namespace common {
+
+inline double DiscXY2Cont(int X, double CELLSIZE) {
+  return X * CELLSIZE + CELLSIZE / 2.0;
+}
+
+inline int ContXY2Disc(double X, double CELLSIZE) {
+  return X >= 0.0 ? static_cast<int>(X / CELLSIZE)
+                  : static_cast<int>(X / CELLSIZE) - 1;
+}
+
+}  // namespace common
+}  // namespace voronoi_planner
