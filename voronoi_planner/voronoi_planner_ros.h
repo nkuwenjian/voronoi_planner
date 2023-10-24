@@ -75,18 +75,22 @@ class VoronoiPlannerROS : public nav_core::BaseGlobalPlanner {
 
  private:
   bool UpdateCostmap(costmap_2d::Costmap2DROS* costmap_ros);
+
   static void GetStartAndEndConfigurations(
       const geometry_msgs::PoseStamped& start,
       const geometry_msgs::PoseStamped& goal, double resolution,
       double origin_x, double origin_y, int* start_x, int* start_y, int* end_x,
       int* end_y);
+
   std::vector<std::vector<VoronoiData>> GetVoronoiDiagram(unsigned int size_x,
                                                           unsigned int size_y,
                                                           double resolution);
+
   static void PopulateVoronoiPath(
       const std::vector<std::pair<int, int>>& searched_result,
       const std_msgs::Header& header, double resolution, double origin_x,
       double origin_y, std::vector<geometry_msgs::PoseStamped>* plan);
+
   static void PublishVoronoiPath(
       const std::vector<geometry_msgs::PoseStamped>& plan,
       const ros::Publisher& pub);

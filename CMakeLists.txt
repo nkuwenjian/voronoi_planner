@@ -9,7 +9,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall")
 
 # set(CMAKE_CXX_CLANG_TIDY
 #   clang-tidy;
-#   -header-filter=${PROJECT_SOURCE_DIR}/include/voronoi_planner;
+#   -header-filter=${PROJECT_SOURCE_DIR}/voronoi_planner;
 #   -warnings-as-errors=*;
 # )
 
@@ -22,14 +22,13 @@ find_package(catkin REQUIRED COMPONENTS
   nav_core
   nav_msgs
   pluginlib
-  roscpp
   voronoi_layer
 )
 
 find_package(glog REQUIRED)
 
 catkin_package(
-  INCLUDE_DIRS include
+  INCLUDE_DIRS ${PROJECT_SOURCE_DIR}
   LIBRARIES voronoi_planner
   CATKIN_DEPENDS
     costmap_2d
@@ -37,18 +36,17 @@ catkin_package(
     nav_core
     nav_msgs
     pluginlib
-    roscpp
     voronoi_layer
 )
 
 include_directories(
-  include
+  ${PROJECT_SOURCE_DIR}
   ${catkin_INCLUDE_DIRS}
 )
 
 add_library(voronoi_planner
-  src/common/heap.cpp
-  src/voronoi_planner_ros.cpp
-  src/voronoi_planner.cpp
+  voronoi_planner/common/heap.cc
+  voronoi_planner/voronoi_planner_ros.cc
+  voronoi_planner/voronoi_planner.cc
 )
 target_link_libraries(voronoi_planner ${catkin_LIBRARIES} glog::glog)
