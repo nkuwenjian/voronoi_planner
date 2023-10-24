@@ -45,11 +45,6 @@ PLUGINLIB_EXPORT_CLASS(voronoi_planner::VoronoiPlannerROS,
 
 namespace voronoi_planner {
 
-VoronoiPlannerROS::VoronoiPlannerROS(std::string name,
-                                     costmap_2d::Costmap2DROS* costmap_ros) {
-  initialize(name, costmap_ros);
-}
-
 void VoronoiPlannerROS::initialize(std::string name,
                                    costmap_2d::Costmap2DROS* costmap_ros) {
   // Check if VoronoiPlannerROS has been initialized.
@@ -131,9 +126,9 @@ std::vector<std::vector<VoronoiData>> VoronoiPlannerROS::GetVoronoiDiagram(
   }
 
   // Check if costmap has a Voronoi layer.
-  for (auto layer = plugins->begin(); layer != plugins->end(); ++layer) {
+  for (auto& plugin : *plugins) {
     auto voronoi_layer =
-        boost::dynamic_pointer_cast<costmap_2d::VoronoiLayer>(*layer);
+        boost::dynamic_pointer_cast<costmap_2d::VoronoiLayer>(plugin);
     if (voronoi_layer == nullptr) {
       continue;
     }
@@ -143,9 +138,9 @@ std::vector<std::vector<VoronoiData>> VoronoiPlannerROS::GetVoronoiDiagram(
     const DynamicVoronoi& voronoi = voronoi_layer->voronoi();
     std::vector<std::vector<VoronoiData>> gvd_map;
     gvd_map.resize(size_x);
-    for (unsigned int i = 0U; i < size_x; ++i) {
+    for (int i = 0; i < static_cast<int>(size_x); ++i) {
       gvd_map[i].resize(size_y);
-      for (unsigned int j = 0U; j < size_y; ++j) {
+      for (int j = 0; j < static_cast<int>(size_y); ++j) {
         gvd_map[i][j].dist = voronoi.getDistance(i, j) * resolution;
         gvd_map[i][j].is_voronoi = voronoi.isVoronoi(i, j);
       }

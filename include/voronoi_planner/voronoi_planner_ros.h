@@ -53,13 +53,6 @@ class VoronoiPlannerROS : public nav_core::BaseGlobalPlanner {
   VoronoiPlannerROS() = default;
 
   /**
-   * @brief  Constructor for the VoronoiPlannerROS object
-   * @param  name The name of this planner
-   * @param  costmap_ros A pointer to the ROS wrapper of the costmap to use
-   */
-  VoronoiPlannerROS(std::string name, costmap_2d::Costmap2DROS* costmap_ros);
-
-  /**
    * @brief  Initialization function for the VoronoiPlannerROS object
    * @param  name The name of this planner
    * @param  costmap_ros A pointer to the ROS wrapper of the costmap to use
@@ -78,7 +71,7 @@ class VoronoiPlannerROS : public nav_core::BaseGlobalPlanner {
                 const geometry_msgs::PoseStamped& goal,
                 std::vector<geometry_msgs::PoseStamped>& plan) override;
 
-  virtual ~VoronoiPlannerROS() = default;
+  ~VoronoiPlannerROS() override = default;
 
  private:
   bool UpdateCostmap(costmap_2d::Costmap2DROS* costmap_ros);
@@ -98,7 +91,6 @@ class VoronoiPlannerROS : public nav_core::BaseGlobalPlanner {
       const std::vector<geometry_msgs::PoseStamped>& plan,
       const ros::Publisher& pub);
 
- private:
   std::unique_ptr<VoronoiPlanner> voronoi_planner_ = nullptr;
   const costmap_2d::Costmap2DROS* costmap_ros_ = nullptr;
   const costmap_2d::Costmap2D* costmap_2d_ = nullptr;
