@@ -50,3 +50,6 @@ add_library(voronoi_planner
   voronoi_planner/voronoi_planner.cc
 )
 target_link_libraries(voronoi_planner ${catkin_LIBRARIES} glog::glog)
+
+add_executable(voronoi_planner_test voronoi_planner/voronoi_planner_ros_test.cc)
+target_link_libraries(voronoi_planner_test voronoi_planner ${catkin_LIBRARIES})

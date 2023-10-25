@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "costmap_2d/costmap_2d_ros.h"
+#include "dynamicvoronoi/dynamicvoronoi.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "nav_core/base_global_planner.h"
 #include "ros/ros.h"
@@ -95,6 +96,9 @@ class VoronoiPlannerROS : public nav_core::BaseGlobalPlanner {
       const std::vector<geometry_msgs::PoseStamped>& plan,
       const ros::Publisher& pub);
 
+  void PublishVoronoiGrid(const DynamicVoronoi& voronoi,
+                          const ros::Publisher& pub) const;
+
   std::unique_ptr<VoronoiPlanner> voronoi_planner_ = nullptr;
   const costmap_2d::Costmap2DROS* costmap_ros_ = nullptr;
   const costmap_2d::Costmap2D* costmap_2d_ = nullptr;
@@ -102,6 +106,7 @@ class VoronoiPlannerROS : public nav_core::BaseGlobalPlanner {
   std::string name_;
 
   ros::Publisher path_pub_;
+  ros::Publisher voronoi_pub_;
   bool initialized_ = false;
 };
 

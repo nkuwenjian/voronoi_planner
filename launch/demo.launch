@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+
+<launch>
+  <param name="/use_sim_time" value="false" />
+
+  <arg name="global_frame" value="map" />
+
+  <arg name="map_file" default="$(find voronoi_planner)/map/map.yaml" />
+
+  <node pkg="voronoi_planner" type="voronoi_planner_test" name="voronoi_planner_test" output="screen">
+    <!-- global_costmap -->
+    <rosparam file="$(find voronoi_planner)/params/costmap_common_params.yaml" command="load" ns="global_costmap" />
+    <rosparam file="$(find voronoi_planner)/params/global_costmap_params.yaml" command="load" />
+    <param name="global_costmap/global_frame" value="$(arg global_frame)" />
+  </node>
+
+  <!-- Mapping -->
+  <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)">
+    <param name="frame_id" value="$(arg global_frame)" />
+  </node>
+
+  <!-- Visualization -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find voronoi_planner)/launch/demo.rviz" />
+
+</launch>

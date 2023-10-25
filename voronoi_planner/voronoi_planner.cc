@@ -40,8 +40,17 @@
 
 namespace voronoi_planner {
 
-VoronoiPlanner::VoronoiPlanner(int max_grid_x, int max_grid_y)
-    : max_grid_x_(max_grid_x), max_grid_y_(max_grid_y) {
+void VoronoiPlanner::Init(int max_grid_x, int max_grid_y,
+                          double circumscribed_radius) {
+  if (initialized_) {
+    LOG(INFO) << "VoronoiPlanner has been initialized.";
+    return;
+  }
+
+  max_grid_x_ = max_grid_x;
+  max_grid_y_ = max_grid_y;
+  circumscribed_radius_ = circumscribed_radius;
+
   open_list_ = std::make_unique<common::Heap>();
 
   dp_lookup_table_.resize(max_grid_x_);
@@ -52,6 +61,8 @@ VoronoiPlanner::VoronoiPlanner(int max_grid_x, int max_grid_y)
   }
 
   ComputeGridSearchActions();
+  initialized_ = true;
+  LOG(INFO) << "VoronoiPlanner is initialized successfully.";
 }
 
 VoronoiPlanner::~VoronoiPlanner() { open_list_->Clear(); }
@@ -189,15 +200,18 @@ void VoronoiPlanner::ComputeGridSearchActions() {
 
 bool VoronoiPlanner::Search(int sx, int sy, int ex, int ey,
                             std::vector<std::vector<VoronoiData>>&& gvd_map,
-                            double circumscribed_radius,
                             std::vector<std::pair<int, int>>* path) {
+  if (!initialized_) {
+    LOG(ERROR) << "VoronoiPlanner has not been initialized.";
+    return false;
+  }
+
   // Sanity checks.
   CHECK_NOTNULL(path);
 
   const auto start_timestamp = std::chrono::system_clock::now();
 
   gvd_map_ = std::move(gvd_map);
-  circumscribed_radius_ = circumscribed_radius;
 
   // Find grid path from start to Voronoi edges.
   int voronoi_start_x = 0;

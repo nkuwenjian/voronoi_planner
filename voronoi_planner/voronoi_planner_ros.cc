@@ -63,10 +63,14 @@ void VoronoiPlannerROS::initialize(std::string name,
     return;
   }
 
-  voronoi_planner_ = std::make_unique<VoronoiPlanner>(
-      costmap_2d_->getSizeInCellsX(), costmap_2d_->getSizeInCellsY());
+  voronoi_planner_ = std::make_unique<VoronoiPlanner>();
+  voronoi_planner_->Init(static_cast<int>(costmap_2d_->getSizeInCellsX()),
+                         static_cast<int>(costmap_2d_->getSizeInCellsY()),
+                         layered_costmap_->getCircumscribedRadius());
 
   path_pub_ = private_nh.advertise<nav_msgs::Path>("voronoi_path", 1);
+  voronoi_pub_ =
+      private_nh.advertise<nav_msgs::OccupancyGrid>("voronoi_grid", 1);
 
   initialized_ = true;
   LOG(INFO) << "VoronoiPlannerROS is initialized successfully.";
@@ -136,6 +140,7 @@ std::vector<std::vector<VoronoiData>> VoronoiPlannerROS::GetVoronoiDiagram(
     std::lock_guard<std::mutex> lock(voronoi_layer->mutex());
 
     const DynamicVoronoi& voronoi = voronoi_layer->voronoi();
+    PublishVoronoiGrid(voronoi, voronoi_pub_);
     std::vector<std::vector<VoronoiData>> gvd_map;
     gvd_map.resize(size_x);
     for (int i = 0; i < static_cast<int>(size_x); ++i) {
@@ -152,13 +157,44 @@ std::vector<std::vector<VoronoiData>> VoronoiPlannerROS::GetVoronoiDiagram(
   return std::vector<std::vector<VoronoiData>>();
 }
 
+void VoronoiPlannerROS::PublishVoronoiGrid(const DynamicVoronoi& voronoi,
+                                           const ros::Publisher& pub) const {
+  // Publish whole grid.
+  nav_msgs::OccupancyGrid grid;
+  grid.header.frame_id = "map";
+  grid.header.stamp = ros::Time();
+  grid.info.resolution = costmap_2d_->getResolution();
+
+  grid.info.width = costmap_2d_->getSizeInCellsX();
+  grid.info.height = costmap_2d_->getSizeInCellsY();
+
+  grid.info.origin.position.x = costmap_2d_->getOriginX();
+  grid.info.origin.position.y = costmap_2d_->getOriginY();
+  grid.info.origin.position.z = 0.0;
+  grid.info.origin.orientation.w = 1.0;
+
+  grid.data.resize(costmap_2d_->getSizeInCellsX() *
+                   costmap_2d_->getSizeInCellsY());
+
+  for (int x = 0; x < static_cast<int>(costmap_2d_->getSizeInCellsX()); ++x) {
+    for (int y = 0; y < static_cast<int>(costmap_2d_->getSizeInCellsY()); ++y) {
+      if (voronoi.isVoronoi(x, y)) {
+        grid.data[x + y * costmap_2d_->getSizeInCellsX()] = 128U;
+      } else {
+        grid.data[x + y * costmap_2d_->getSizeInCellsX()] = 0U;
+      }
+    }
+  }
+  pub.publish(grid);
+}
+
 bool VoronoiPlannerROS::makePlan(
     const geometry_msgs::PoseStamped& start,
     const geometry_msgs::PoseStamped& goal,
     std::vector<geometry_msgs::PoseStamped>& plan) {
   // Check if VoronoiPlannerROS has been initialized.
   if (!initialized_) {
-    ROS_ERROR("voronoi_planner is not initialized");
+    LOG(ERROR) << "VoronoiPlannerROS has not been initialized.";
     return false;
   }
 
@@ -182,9 +218,8 @@ bool VoronoiPlannerROS::makePlan(
 
   // Search path via Voronoi planner.
   std::vector<std::pair<int, int>> path;
-  if (!voronoi_planner_->Search(
-          start_x, start_y, end_x, end_y, std::move(gvd_map),
-          layered_costmap_->getCircumscribedRadius(), &path)) {
+  if (!voronoi_planner_->Search(start_x, start_y, end_x, end_y,
+                                std::move(gvd_map), &path)) {
     LOG(ERROR) << "Failed to find the shortest Voronoi path";
     return false;
   }

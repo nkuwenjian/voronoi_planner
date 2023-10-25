@@ -66,12 +66,11 @@ struct GridSearchResult {
 
 class VoronoiPlanner {
  public:
-  VoronoiPlanner(int max_grid_x, int max_grid_y);
+  VoronoiPlanner() = default;
   ~VoronoiPlanner();
-
+  void Init(int max_grid_x, int max_grid_y, double circumscribed_radius);
   bool Search(int sx, int sy, int ex, int ey,
               std::vector<std::vector<VoronoiData>>&& gvd_map,
-              double circumscribed_radius,
               std::vector<std::pair<int, int>>* path);
 
  private:
@@ -111,6 +110,7 @@ class VoronoiPlanner {
   SearchType search_type_;
   bool need_check_voronoi_ = false;
   std::size_t iterations_ = 0U;
+  bool initialized_ = false;
 };
 
 }  // namespace voronoi_planner
