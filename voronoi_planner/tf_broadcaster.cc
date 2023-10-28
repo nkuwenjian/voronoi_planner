@@ -49,8 +49,8 @@ class TfBroadcaster {
   void Initialize();
 
  private:
-  void GetRosParameters(const ros::NodeHandle& nh,
-                        double* transform_publish_period);
+  void LoadRosParamFromNodeHandle(const ros::NodeHandle& nh,
+                                  double* transform_publish_period);
   void SetStart(
       const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& start);
   void PublishTransform();
@@ -66,7 +66,11 @@ class TfBroadcaster {
   std::unique_ptr<std::thread> transform_thread_ = nullptr;
 };
 
-TfBroadcaster::~TfBroadcaster() { transform_thread_->join(); }
+TfBroadcaster::~TfBroadcaster() {
+  if (transform_thread_ != nullptr) {
+    transform_thread_->join();
+  }
+}
 
 void TfBroadcaster::Initialize() {
   start_sub_ = nh_.subscribe("initialpose", 1, &TfBroadcaster::SetStart, this);
@@ -76,7 +80,7 @@ void TfBroadcaster::Initialize() {
   // Retrieve parameters
   ros::NodeHandle private_nh("~");
   double transform_publish_period;
-  GetRosParameters(private_nh, &transform_publish_period);
+  LoadRosParamFromNodeHandle(private_nh, &transform_publish_period);
 
   // Create a thread to periodically publish the latest map->base_link
   // transform; it needs to go out regularly, uninterrupted by potentially
@@ -87,8 +91,8 @@ void TfBroadcaster::Initialize() {
       });
 }
 
-void TfBroadcaster::GetRosParameters(const ros::NodeHandle& nh,
-                                     double* transform_publish_period) {
+void TfBroadcaster::LoadRosParamFromNodeHandle(
+    const ros::NodeHandle& nh, double* transform_publish_period) {
   nh.param("transform_publish_period", *transform_publish_period, 0.05);
   VLOG(4) << std::fixed
           << "transform_publish_period: " << *transform_publish_period;
