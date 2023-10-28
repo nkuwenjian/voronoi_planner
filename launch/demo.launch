@@ -14,6 +14,9 @@
     <param name="global_costmap/global_frame" value="$(arg global_frame)" />
   </node>
 
+  <!-- tf -->
+  <node pkg="voronoi_planner" type="voronoi_planner_tf_broadcaster" name="voronoi_planner_tf_broadcaster" output="screen"/>
+
   <!-- Mapping -->
   <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)">
     <param name="frame_id" value="$(arg global_frame)" />

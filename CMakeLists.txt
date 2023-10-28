@@ -53,3 +53,6 @@ target_link_libraries(voronoi_planner ${catkin_LIBRARIES} glog::glog)
 
 add_executable(voronoi_planner_test voronoi_planner/voronoi_planner_ros_test.cc)
 target_link_libraries(voronoi_planner_test voronoi_planner ${catkin_LIBRARIES})
+
+add_executable(voronoi_planner_tf_broadcaster voronoi_planner/tf_broadcaster.cc)
+target_link_libraries(voronoi_planner_tf_broadcaster ${catkin_LIBRARIES} glog::glog)
