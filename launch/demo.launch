@@ -5,7 +5,7 @@
 
   <arg name="global_frame" value="map" />
 
-  <arg name="map_file" default="$(find voronoi_planner)/map/map.yaml" />
+  <arg name="map_file" default="$(find voronoi_planner)/map/maze_5cm/map.yaml" />
 
   <node pkg="voronoi_planner" type="voronoi_planner_test" name="voronoi_planner_test" output="screen">
     <!-- global_costmap -->
