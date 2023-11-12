@@ -1,23 +1,25 @@
-/*
- * Copyright (c) 2008, Maxim Likhachev
+/******************************************************************************
+ * Copyright (c) 2023, NKU Mobile & Flying Robotics Lab
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the Carnegie Mellon University nor the names of its
- *       contributors may be used to endorse or promote products derived from
- *       this software without specific prior written permission.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS'
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
  * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
@@ -25,7 +27,9 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- */
+ *
+ * Author: Jian Wen (nkuwenjian@gmail.com)
+ *****************************************************************************/
 
 #include "voronoi_planner/common/heap.h"
 
@@ -36,24 +40,24 @@ namespace common {
 
 Heap::Heap() { queue_.resize(capacity_); }
 
-Heap::Heap(const int capacity) : capacity_(capacity) {
+Heap::Heap(const std::size_t capacity) : capacity_(capacity) {
   queue_.resize(capacity);
 }
 
 Heap::~Heap() { Clear(); }
 
 void Heap::Clear() {
-  for (int i = 1; i <= size_; ++i) {
+  for (std::size_t i = 1; i <= size_; ++i) {
     queue_[i].node->set_heap_index(0);
   }
   size_ = 0;
 }
 
-void Heap::PercolateDown(int hole, HeapElement obj) {
+void Heap::PercolateDown(std::size_t hole, HeapElement obj) {
   // Sanity checks.
   CHECK(!Empty());
 
-  int child;
+  std::size_t child;
   for (; 2 * hole <= size_; hole = child) {
     child = 2 * hole;
     if (child != size_ && queue_[child + 1].key < queue_[child].key) {
@@ -70,7 +74,7 @@ void Heap::PercolateDown(int hole, HeapElement obj) {
   queue_[hole].node->set_heap_index(hole);
 }
 
-void Heap::PercolateUp(int hole, HeapElement obj) {
+void Heap::PercolateUp(std::size_t hole, HeapElement obj) {
   // Sanity checks.
   CHECK(!Empty());
 
@@ -82,7 +86,7 @@ void Heap::PercolateUp(int hole, HeapElement obj) {
   queue_[hole].node->set_heap_index(hole);
 }
 
-void Heap::PercolateUpOrDown(int hole, HeapElement obj) {
+void Heap::PercolateUpOrDown(std::size_t hole, HeapElement obj) {
   // Sanity checks.
   CHECK(!Empty());
 

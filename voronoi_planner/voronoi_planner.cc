@@ -73,7 +73,8 @@ void VoronoiPlanner::Clear() {
 
   // clear closed list
   closed_list_.clear();
-  closed_list_.resize(max_grid_x_ * max_grid_y_, common::NodeStatus::OPEN);
+  closed_list_.resize(max_grid_x_ * max_grid_y_,
+                      common::Node::NodeStatus::OPEN);
 
   start_node_ = nullptr;
   end_node_ = nullptr;
@@ -298,7 +299,7 @@ bool VoronoiPlanner::SearchPathToVoronoiEdges(int sx, int sy, int ex, int ey,
     CHECK_NOTNULL(node);
     CHECK_NE(node->g(), common::kInfiniteCost);
     closed_list_[CalcGridXYIndex(node->grid_x(), node->grid_y())] =
-        common::NodeStatus::CLOSED;
+        common::Node::NodeStatus::CLOSED;
 
     int curr_x = node->grid_x();
     int curr_y = node->grid_y();
@@ -352,7 +353,7 @@ bool VoronoiPlanner::SearchPathAlongVoronoiEdges(int sx, int sy, int ex, int ey,
     CHECK_NOTNULL(node);
     CHECK_NE(node->g(), common::kInfiniteCost);
     closed_list_[CalcGridXYIndex(node->grid_x(), node->grid_y())] =
-        common::NodeStatus::CLOSED;
+        common::Node::NodeStatus::CLOSED;
 
     // new expand
     ++explored_node_num;
@@ -388,7 +389,7 @@ void VoronoiPlanner::UpdateSuccs(const Node2d* curr_node) {
       continue;
     }
     if (closed_list_[CalcGridXYIndex(succ_x, succ_y)] ==
-        common::NodeStatus::CLOSED) {
+        common::Node::NodeStatus::CLOSED) {
       continue;
     }
     if (!CheckVoronoi(succ_x, succ_y)) {

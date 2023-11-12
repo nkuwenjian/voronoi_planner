@@ -46,8 +46,6 @@
 
 namespace voronoi_planner {
 
-enum class SearchType : int { A_STAR, DP };
-
 struct VoronoiData {
   bool is_voronoi = false;
   double dist = 0.0;
@@ -66,8 +64,11 @@ struct GridSearchResult {
 
 class VoronoiPlanner {
  public:
+  enum class SearchType { A_STAR, DP };
+
   VoronoiPlanner() = default;
   ~VoronoiPlanner();
+
   void Init(int max_grid_x, int max_grid_y, double circumscribed_radius);
   bool Search(int sx, int sy, int ex, int ey,
               std::vector<std::vector<VoronoiData>>&& gvd_map,
@@ -100,7 +101,7 @@ class VoronoiPlanner {
   int max_grid_y_ = 0;
   std::vector<std::vector<Node2d>> dp_lookup_table_;
   std::unique_ptr<common::Heap> open_list_ = nullptr;
-  std::vector<common::NodeStatus> closed_list_;
+  std::vector<common::Node::NodeStatus> closed_list_;
   double circumscribed_radius_;
   Node2d* start_node_ = nullptr;
   Node2d* end_node_ = nullptr;

@@ -34,18 +34,20 @@
 namespace voronoi_planner {
 namespace common {
 
-enum class NodeStatus : int { OPEN, CLOSED };
-
 class Node {
  public:
+  enum class NodeStatus { OPEN, CLOSED };
+
   Node() = default;
   virtual ~Node() = default;
 
-  int heap_index() const { return heap_index_; }
-  void set_heap_index(const int heap_index) { heap_index_ = heap_index; }
+  std::size_t heap_index() const { return heap_index_; }
+  void set_heap_index(const std::size_t heap_index) {
+    heap_index_ = heap_index;
+  }
 
  protected:
-  int heap_index_ = 0;
+  std::size_t heap_index_ = 0;
 };
 
 }  // namespace common
