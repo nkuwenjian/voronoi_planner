@@ -88,9 +88,9 @@ class VoronoiPlannerROS : public nav_core::BaseGlobalPlanner {
                                                           double resolution);
 
   static void PopulateVoronoiPath(
-      const std::vector<std::pair<int, int>>& searched_result,
-      const std_msgs::Header& header, double resolution, double origin_x,
-      double origin_y, std::vector<geometry_msgs::PoseStamped>* plan);
+      const VoronoiSearchResult& result, const std_msgs::Header& header,
+      double resolution, double origin_x, double origin_y,
+      std::vector<geometry_msgs::PoseStamped>* plan);
 
   static void PublishVoronoiPath(
       const std::vector<geometry_msgs::PoseStamped>& plan,

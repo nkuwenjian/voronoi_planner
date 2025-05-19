@@ -66,6 +66,7 @@ void VoronoiPlannerROS::initialize(std::string name,
   voronoi_planner_ = std::make_unique<VoronoiPlanner>();
   voronoi_planner_->Init(static_cast<int>(costmap_2d_->getSizeInCellsX()),
                          static_cast<int>(costmap_2d_->getSizeInCellsY()),
+                         costmap_2d_->getResolution(),
                          layered_costmap_->getCircumscribedRadius());
 
   path_pub_ = private_nh.advertise<nav_msgs::Path>("voronoi_path", 1);
@@ -146,8 +147,10 @@ std::vector<std::vector<VoronoiData>> VoronoiPlannerROS::GetVoronoiDiagram(
     for (int i = 0; i < static_cast<int>(size_x); ++i) {
       gvd_map[i].resize(size_y);
       for (int j = 0; j < static_cast<int>(size_y); ++j) {
-        gvd_map[i][j].dist = voronoi.getDistance(i, j) * resolution;
         gvd_map[i][j].is_voronoi = voronoi.isVoronoi(i, j);
+        gvd_map[i][j].is_occupied = voronoi.isOccupied(i, j);
+        gvd_map[i][j].dist_in_grid = voronoi.getDistance(i, j);
+        gvd_map[i][j].dist_in_world = voronoi.getDistance(i, j) * resolution;
       }
     }
     return gvd_map;
@@ -217,15 +220,15 @@ bool VoronoiPlannerROS::makePlan(
   }
 
   // Search path via Voronoi planner.
-  std::vector<std::pair<int, int>> path;
-  if (!voronoi_planner_->Search(start_x, start_y, end_x, end_y,
-                                std::move(gvd_map), &path)) {
+  VoronoiSearchResult result;
+  if (!voronoi_planner_->Search(start_x, start_y, end_x, end_y, gvd_map,
+                                &result)) {
     LOG(ERROR) << "Failed to find the shortest Voronoi path";
     return false;
   }
 
   // Populate global path.
-  PopulateVoronoiPath(path, start.header, costmap_2d_->getResolution(),
+  PopulateVoronoiPath(result, start.header, costmap_2d_->getResolution(),
                       costmap_2d_->getOriginX(), costmap_2d_->getOriginY(),
                       &plan);
 
@@ -236,20 +239,21 @@ bool VoronoiPlannerROS::makePlan(
 }
 
 void VoronoiPlannerROS::PopulateVoronoiPath(
-    const std::vector<std::pair<int, int>>& searched_result,
-    const std_msgs::Header& header, double resolution, double origin_x,
-    double origin_y, std::vector<geometry_msgs::PoseStamped>* plan) {
+    const VoronoiSearchResult& result, const std_msgs::Header& header,
+    double resolution, double origin_x, double origin_y,
+    std::vector<geometry_msgs::PoseStamped>* plan) {
   // Sanity checks.
   CHECK_NOTNULL(plan);
 
   plan->clear();
   geometry_msgs::PoseStamped pose_stamped;
   pose_stamped.header = header;
-  for (const auto& pose : searched_result) {
+  const int size = static_cast<int>(result.x.size());
+  for (int i = 0; i < size; ++i) {
     pose_stamped.pose.position.x =
-        common::DiscXY2Cont(pose.first, resolution) + origin_x;
+        common::DiscXY2Cont(result.x[i], resolution) + origin_x;
     pose_stamped.pose.position.y =
-        common::DiscXY2Cont(pose.second, resolution) + origin_y;
+        common::DiscXY2Cont(result.y[i], resolution) + origin_y;
     pose_stamped.pose.orientation = tf::createQuaternionMsgFromYaw(0.0);
     plan->push_back(pose_stamped);
   }
